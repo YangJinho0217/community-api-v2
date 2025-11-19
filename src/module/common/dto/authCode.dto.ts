@@ -3,7 +3,7 @@ import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-vali
 export class authCodeDto {
 
   @IsString()
-  @IsNotEmpty({ message: 'Required phone' })
+  @IsNotEmpty({ message : 'Required phone' })
   phone: string; 
 
   @IsString()

@@ -1,22 +1,25 @@
 
+import moment from "moment";
 
 export class ApiResponse<T> {
     constructor (
-        public message : string,
+        public reason : string,
         public success : boolean,
-        public status_code : number,
+        public statsCode : number,
         public data : T,
     ) {}
 
-    static success<T>(data : T, message : string = "Success") {
-        return new ApiResponse(message, true, 200, data);
+    static success<T>(data : T, reason : string = "Success") {
+        return new ApiResponse(reason, true, 200, data);
     }
     
-    static message(message : string) {
+    static message(reason : string) {
         return {
-            message: message,
+            timestamp : moment().format('YYYY-MM-DD HH:mm:ss'),
             success: true,
-            status_code: 200
+            reason : reason,
+            statsCode: 200,
+            
         };
     }
 }

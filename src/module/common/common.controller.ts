@@ -7,6 +7,7 @@ import { getNickNameDto } from './dto/getNickName.dto';
 import { sendUserAuthCodeDto } from './dto/sendUserCode.dto';
 import { authCodeDto } from './dto/authCode.dto';
 import { getReferrerDto } from './dto/getReferrer.dto';
+import { SignUpDto } from './dto/signUp.dto';
 
 @Controller("/api/v1/common")
 export class CommonController {
@@ -47,6 +48,12 @@ export class CommonController {
   async authenticateCode(@Body() authCodeDto : authCodeDto) {
     const data = await this.commonService.checkUserAuthCode(authCodeDto);
     if(data == 200) return ApiResponse.message('Authenticated');
+  }
+
+  @Post("/auth/signUp")
+  async trySignUp(@Body() SignUpDto : SignUpDto) {
+    const data = await this.commonService.trySignUp(SignUpDto);
+    if(data == 200) return ApiResponse.message('SignUp Success');
   }
 
 

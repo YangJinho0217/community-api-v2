@@ -42,8 +42,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     console.log('DB Connection closed.');
   }
 
-  // Raw Query 실행
+  // Raw Query 실행ㅇ
   async query<T = any>(sql: string, params?: any[]): Promise<T[]> {
+    this.logQuery(sql, params); // 쿼리 로그 추가
     const [rows] = await this.pool.execute(sql, params);
     return rows as T[];
   }

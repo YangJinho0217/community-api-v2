@@ -2,6 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { PoolConnection } from 'mysql2/promise';
+import { SignUpDto } from './dto/signUp.dto';
 
 @Injectable()
 export class CommonRepository {
@@ -193,4 +194,46 @@ export class CommonRepository {
     return result[0];
   }
 
+  async insertPointTransaction(connection: PoolConnection, user_id : Number, type : String, point : Number) {
+    const sql = `
+    INSERT INTO user_point_transaction(user_id, date, type, count, total_point)
+    VALUES (?,CURDATE(),?,?,?)
+    ON DUPLICATE KEY UPDATE 
+    count = count + VALUES(count),
+    total_point = total_point + VALUES(total_point)`
+    const [result] = await connection.execute(sql, [user_id, type, 1, point]);
+    return result;
+  }
+
+  async insertPointHistory(connection: PoolConnection, user_id : Number, type : String, point : Number) {
+    const sql = `
+    INSERT INTO user_point_history(user_id, point_type, type, point)
+    VALUES (?,?,?,?)`;
+    const [result] = await connection.execute(sql, [user_id, 'earn', type, point]);
+    return result;
+  }
+
+  async insertUserData(signUpDto : SignUpDto, referrerId : Number) {
+
+    console.log(signUpDto);
+    console.log(referrerId);
+  }
+
+  // 트랜잭션으로 유저 포인트 업데이트(Transaction, History)
+  async insertSignUp(parameter : any) {
+    return await this.db.transaction(async (connection) => {
+
+      // const referrer = parameter.referrer;
+      // const user_id = parameter.user_id;
+      // const type = parameter.type;
+      // const point = parameter.point;
+
+      // if(referrer) {
+      //   // 추천인에게 포인트 지급. 근데 나한테도 보내줘야하기 때문에 회원가입 후 InsertId로 본인 지급 로직 필요.
+      //   await this.insertPointTransaction(connection, user_id, type, point)
+      //   await this.insertPointHistory(connection, user_id, type, point);
+      // }
+
+    });
+  }
 }
