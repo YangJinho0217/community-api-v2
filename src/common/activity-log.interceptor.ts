@@ -27,11 +27,17 @@ export class ActivityLogInterceptor implements NestInterceptor {
     }
     
     // IP 주소 추출 (프록시 환경 고려)
-    let ip = request.ip || 
-             request.headers['x-forwarded-for'] as string || 
-             request.headers['x-real-ip'] as string || 
-             request.connection?.remoteAddress || 
-             'unknown';
+    // let ip = request.ip || 
+    //          request.headers['x-forwarded-for'] as string || 
+    //          request.headers['x-real-ip'] as string || 
+    //          request.connection?.remoteAddress || 
+    //          'unknown';
+
+    const ip =
+      (headers['x-forwarded-for'] as string)?.split(',')[0].trim() || // Nginx 프록시
+      (headers['x-real-ip'] as string) ||                              // Nginx real-ip
+      request.connection?.remoteAddress ||                             // 직접 연결
+      'unknown';
     
     // JWT에서 user_id 추출 (있는 경우)
     const user = (request as any).user;
