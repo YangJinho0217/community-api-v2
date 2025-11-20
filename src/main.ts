@@ -8,11 +8,11 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 
 async function bootstrap() {
-  const server = express();
+  // const server = express();
   const app = await NestFactory.create(AppModule);
 
   // 프록시 환경에서 클라이언트 IP 제대로 받기
-  server.set('trust proxy', true);
+  // server.set('trust proxy', true);
   // 쿠키 파서 미들웨어 등록 (PC 클라이언트 토큰 읽기용)
   app.use(cookieParser());
 

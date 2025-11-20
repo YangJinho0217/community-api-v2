@@ -32,11 +32,26 @@ export class ActivityLogInterceptor implements NestInterceptor {
     //          request.headers['x-real-ip'] as string || 
     //          request.connection?.remoteAddress || 
     //          'unknown';
-    let ip =
-    (request.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || // 프록시 환경
-    (request.headers['x-real-ip'] as string) ||                              // fallback
-    request.socket?.remoteAddress ||                                         // direct socket
-    'unknown';
+    // let ip =
+    // (request.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || // 프록시 환경
+    // (request.headers['x-real-ip'] as string) ||                              // fallback
+    // request.socket?.remoteAddress ||                                         // direct socket
+    // 'unknown';
+
+     const getClientIp = (req: Request): string => {
+      const forwarded = req.headers['x-forwarded-for'] as string | undefined;
+      let ip = forwarded?.split(',')[0].trim() ||
+               req.headers['x-real-ip'] as string ||
+               req.socket?.remoteAddress ||
+               req.connection?.remoteAddress ||
+               'unknown';
+
+      // IPv6 형식 제거
+    //   if (ip.startsWith('::ffff:')) ip = ip.replace('::ffff:', '');
+      return ip;
+    };
+
+    const ip = getClientIp(request);
     
     // JWT에서 user_id 추출 (있는 경우)
     const user = (request as any).user;
