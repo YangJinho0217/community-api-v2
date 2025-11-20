@@ -2,9 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/http-exceptionFilter';
+import { ActivityLogInterceptor } from './common/activity-log.interceptor';
+import { DatabaseService } from './database/database.service';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // 쿠키 파서 미들웨어 등록 (PC 클라이언트 토큰 읽기용)
+  app.use(cookieParser());
 
    app.useGlobalPipes(
     new ValidationPipe({
@@ -14,6 +20,11 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter);
+  
+  // Activity Log Interceptor를 전역으로 등록
+  const databaseService = app.get(DatabaseService);
+  app.useGlobalInterceptors(new ActivityLogInterceptor(databaseService));
+  
   await app.listen(process.env.PORT ?? 9090);
 }
 bootstrap();

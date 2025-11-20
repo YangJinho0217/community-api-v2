@@ -1,6 +1,6 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
-export class getUuidDto {
+export class GetUuidDto {
 
   @IsString()
   @IsNotEmpty({ message: 'Required uuid' })

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
+import type { Response, Request } from 'express';
 import { CommonRepository } from './common.repository';
 import { HashService } from 'src/common/hash.service';
 import { AuthService } from 'src/auth/auth.service';
@@ -8,12 +9,17 @@ import { createAuthCodeWithLength } from 'src/common/authCode.util';
 
 // DTO
 import { LoginDto } from './dto/login.dto';
-import { getUuidDto } from './dto/getUuid.dto';
-import { getNickNameDto } from './dto/getNickName.dto';
-import { sendUserAuthCodeDto } from './dto/sendUserCode.dto';
-import { authCodeDto } from './dto/authCode.dto';
-import { getReferrerDto } from './dto/getReferrer.dto';
+import { GetUuidDto } from './dto/getUuid.dto';
+import { GetNickNameDto } from './dto/getNickName.dto';
+import { SendUserAuthCodeDto } from './dto/sendUserCode.dto';
+import { AuthCodeDto } from './dto/authCode.dto';
+import { GetReferrerDto } from './dto/getReferrer.dto';
 import { SignUpDto } from './dto/signUp.dto';
+import { RefreshTokenDto } from './dto/refreshToken.dto';
+import { JwtAuthGuard } from 'src/auth/jwt/jwt-auth.guard';
+import { GetUserUuidDto } from './dto/getUserUuid.dto';
+import { GetUserPasswordDto } from './dto/getUserPassword.dto';
+import { UpdateUserPasswordDto } from './dto/updateUserPassword.dto';
 
 @Injectable()
 export class CommonService {
@@ -30,7 +36,17 @@ export class CommonService {
 
   async trySignUp(signupDto: SignUpDto) {
 
-    let referrerId;
+    let parameter = {
+      type : 'basic',
+      user_level : '01',
+      user_status : 0,
+      insignia_id : 1,
+      insignia_level : '00',
+      referrer_id: null as number | null,
+      password: '' as string,
+      password_hash_key: '' as string,
+    };
+
     /**
      * * 유효성 검사 실시
     */ 
@@ -107,22 +123,24 @@ export class CommonService {
         throw new NotFoundException('not_found_referrer');
       }
 
-      referrerId = notfound_referrer.id;
-
+      parameter.referrer_id = notfound_referrer.id;
+      
     }
-
 
     const password = this.hashService.hashPasswordWithNewSalt(signupDto.password);
 
-    console.log(password);
+    if(password) {
+      parameter.password = password.hashedPassword;
+      parameter.password_hash_key = password.salt;
+    }
 
-    const insertUserData = await this.commonRepository.insertUserData(signupDto, referrerId);
+    await this.commonRepository.insertSignUp(signupDto, parameter);
 
     return 200;
 
   }
 
-  async tryLogin(loginDto: LoginDto) {
+  async tryLogin(loginDto: LoginDto, response?: Response) {
 
     const user = await this.commonRepository.findUserOne(loginDto.uuid);
 
@@ -215,18 +233,40 @@ export class CommonService {
       refesh_authorization: session_parameter.refresh_session,
       noti_count: user[0].noti_count
     }
+    
+    if (loginDto.device_type === 'pc' && response) {
+      // console.log('🍪 PC 클라이언트 - 쿠키 설정 시작');
+      response.cookie('access_token', access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax', // strict에서 lax로 변경 (테스트 환경에서 더 관대함)
+        maxAge: 60 * 60 * 1000 // 1시간
+      });
+      
+      response.cookie('refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax', // strict에서 lax로 변경
+        maxAge: 24 * 60 * 60 * 1000 // 24시간
+      });
+
+      // PC 클라이언트용 응답에서는 토큰 정보 제거 (보안상 이유)
+      result_user.authorization = '';
+      result_user.refesh_authorization = '';
+      // console.log('✅ PC 클라이언트 - 쿠키 설정 및 토큰 제거 완료');
+    }
 
     return result_user;
   }
 
-  async getUuid(getUuidDto: getUuidDto) {
+  async getUuid(getUuidDto: GetUuidDto) {
 
     const uuid = getUuidDto.uuid;
 
     // uuid check
     const uuidRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{5,20}$/;
     if (!uuidRegex.test(uuid)) {
-      throw new BadRequestException('invalid_uuid_format');
+      throw new BadRequestException('invalid_uuid');
     }
 
     const findUuid = await this.commonRepository.findUserUuid(uuid);
@@ -239,58 +279,61 @@ export class CommonService {
 
   }
 
-  async getNickName(getNickNameDto: getNickNameDto) {
+  async getNickName(getNickNameDto: GetNickNameDto) {
 
     const nickName = getNickNameDto.nickName;
 
     const nameRegex = /^[가-힣a-zA-Z0-9]{2,10}$/;
     if (!nameRegex.test(nickName)) {
-      throw new BadRequestException('invalid_nickName_format');
+      throw new BadRequestException('invalid_nick_name');
     }
 
     const findNickName = await this.commonRepository.findNickName(nickName);
 
     if (findNickName?.nick_name) {
-      throw new ConflictException('nickName_already_exists');
+      throw new ConflictException('nick_name_already_exists');
     }
 
     return 200;
 
   }
 
-  async sendUserAuthCode(sendUserAuthCodeDto: sendUserAuthCodeDto) {
+  async sendUserAuthCode(sendUserAuthCodeDto: SendUserAuthCodeDto) {
 
     const phone = sendUserAuthCodeDto.phone;
+    const type = sendUserAuthCodeDto.type;
 
     const phoneRegex = /^01[0-9][0-9]{3,4}[0-9]{4}$/;
     if (!phoneRegex.test(phone)) {
-      throw new BadRequestException('invalid_phone_format');
+      throw new BadRequestException('invalid_phone');
     }
 
     const findUserPhone = await this.commonRepository.findUserPhone(phone);
-    if (findUserPhone?.phone) {
-      throw new ConflictException('phone_already_exists');
+    if(type == 'signup') {
+      if (findUserPhone?.phone) {
+        throw new ConflictException('phone_already_exists');
+      }
     }
-
+    
     const authcode = await createAuthCodeWithLength(6);
     await this.commonRepository.insertPhoneAuthCode(phone, authcode);
 
     return authcode;
   }
 
-  async checkUserAuthCode(authCodeDto: authCodeDto) {
+  async checkUserAuthCode(authCodeDto: AuthCodeDto) {
 
     const phone = authCodeDto.phone;
     const auth_code = authCodeDto.auth_code;
 
     const phoneRegex = /^01[0-9][0-9]{3,4}[0-9]{4}$/;
     if (!phoneRegex.test(phone)) {
-      throw new BadRequestException('invalid_phone_format');
+      throw new BadRequestException('invalid_phone');
     }
 
     const findUserPhoneAuthCode = await this.commonRepository.findPhoneAuthCode(phone);
 
-    if (!findUserPhoneAuthCode?.phone) {
+    if (!findUserPhoneAuthCode?.user_phone) {
       throw new NotFoundException('not_found_phone')
     }
 
@@ -302,13 +345,13 @@ export class CommonService {
 
   }
 
-  async getReferrer(getReferrerDto: getReferrerDto) {
+  async getReferrer(getReferrerDto: GetReferrerDto) {
 
     const referrer = getReferrerDto.referrer;
 
     const uuidRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{5,20}$/;
     if (!uuidRegex.test(referrer)) {
-      throw new BadRequestException('invalid_referrer_format');
+      throw new BadRequestException('invalid_referrer');
     }
 
     const findReferrerUuid = await this.commonRepository.findReferrerUuid(referrer);
@@ -321,5 +364,223 @@ export class CommonService {
   }
 
 
+  async getRefreshToken(refreshTokenDto: RefreshTokenDto, request?: any, response?: Response) {
+
+    let result = {
+      accessToken: '',
+      refreshToken: ''
+    }
+
+    // Refresh Token 우선순위: Body -> Cookie
+    let refresh_token = refreshTokenDto.refesh_authorization;
+    
+    // Body에 토큰이 없으면 쿠키에서 확인 (PC 클라이언트용)
+    if (!refresh_token && request && request.cookies) {
+      refresh_token = request.cookies.refresh_token;
+    }
+
+    if (!refresh_token) {
+      throw new BadRequestException('refresh_token_required');
+    }
+
+    const authVerify = this.authService.verifyToken(refresh_token);
+
+    if (authVerify.user_id) {
+
+      const access_token = this.authService.createAccessToken({
+        user_id: authVerify.user_id, // id -> user_id 수정
+        uuid: authVerify.uuid,
+        user_name: authVerify.user_name,
+        nick_name: authVerify.nick_name,
+        user_status: authVerify.user_status,
+        is_deleted: authVerify.is_deleted,
+        type: 'access'
+      })
+
+      const new_refresh_token = this.authService.createRefreshToken({
+        user_id: authVerify.user_id, // id -> user_id 수정
+        uuid: authVerify.uuid,
+        user_name: authVerify.user_name,
+        nick_name: authVerify.nick_name,
+        user_status: authVerify.user_status,
+        is_deleted: authVerify.is_deleted,
+        type: 'refresh'
+      })
+
+      result.accessToken = access_token;
+      result.refreshToken = new_refresh_token;
+
+      await this.commonRepository.updateUserTokenSet(result.accessToken, result.refreshToken, authVerify.user_id);
+
+      // PC 클라이언트이고 쿠키로 요청이 왔다면 새로운 토큰을 쿠키에 저장
+      if (request && request.cookies && request.cookies.refresh_token && response) {
+        response.cookie('access_token', access_token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 1000 // 1시간
+        });
+        
+        response.cookie('refresh_token', new_refresh_token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 24 * 60 * 60 * 1000 // 24시간
+        });
+
+        // PC 클라이언트용 응답에서는 토큰 정보 제거
+        result.accessToken = '';
+        result.refreshToken = '';
+      }
+
+      return result;
+    } else {
+      throw new BadRequestException('invalid_refresh_token');
+    }
+
+  }
+
+  async getUserUuid(getUserUuidDto : GetUserUuidDto) {
+
+    const phone = getUserUuidDto.phone;
+    const auth_code = getUserUuidDto.auth_code;
+
+    const findUserPhoneAuthCode = await this.commonRepository.findPhoneAuthCode(phone);
+
+    if (!findUserPhoneAuthCode?.user_phone) {
+      throw new NotFoundException('not_found_phone');
+    }
+
+    if (findUserPhoneAuthCode?.code != auth_code) {
+      throw new BadRequestException('invalid_auth_code');
+    }
+
+    const user = await this.commonRepository.getUserUuid(phone);
+    return user;
+  }
+
+  async getUserPassword(getUserPasswordDto : GetUserPasswordDto) {
+
+    const uuid = getUserPasswordDto.uuid;
+    const phone = getUserPasswordDto.phone;
+    const auth_code = getUserPasswordDto.auth_code;
+
+    // 유저 uuid 검사
+    if(uuid) {
+      const uuidRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{5,20}$/;
+      if (!uuidRegex.test(uuid)) {
+        throw new ForbiddenException('invalid_uuid');
+      }
+    }
+    
+    if(phone) {
+      const phoneRegex = /^01[0-9][0-9]{3,4}[0-9]{4}$/;
+      if (!phoneRegex.test(phone)) {
+        throw new ForbiddenException('invalid_phone');
+      }
+    }
+
+    const findUserPhoneAuthCode = await this.commonRepository.findPhoneAuthCode(phone);
+
+    if (!findUserPhoneAuthCode?.user_phone) {
+      throw new NotFoundException('not_found_phone');
+    }
+
+    if (findUserPhoneAuthCode?.code != auth_code) {
+      throw new BadRequestException('invalid_auth_code');
+    }
+
+    const userUuid = await this.commonRepository.getUserUuid(phone);
+    if(!userUuid) {
+      throw new NotFoundException('not_found_uuid');
+    }
+
+    if(userUuid.uuid != uuid) {
+      throw new BadRequestException('uuid_mismatch');
+    }
+
+    return 200;
+
+  }
+
+  async updateUserPassword(updateUserPasswordDto : UpdateUserPasswordDto) {
+
+    let parameter = {
+      password : '',
+      password_salt_key : ''
+    };
+    const uuid = updateUserPasswordDto.uuid;
+    const phone = updateUserPasswordDto.phone;
+    const auth_code = updateUserPasswordDto.auth_code;
+    const password = updateUserPasswordDto.password;
+    const check_password = updateUserPasswordDto.check_password;
+
+    // 유저 uuid 검사
+    if(uuid) {
+      const uuidRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{5,20}$/;
+      if (!uuidRegex.test(uuid)) {
+        throw new ForbiddenException('invalid_uuid');
+      }
+    }
+    
+    if(phone) {
+      const phoneRegex = /^01[0-9][0-9]{3,4}[0-9]{4}$/;
+      if (!phoneRegex.test(phone)) {
+        throw new ForbiddenException('invalid_phone');
+      }
+    }
+
+    if(password) {
+      // 비밀번호 유효성 검사: 영문 + 숫자 + 특수문자 포함, 8자 이상
+      const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*+])[A-Za-z\d!@#$%^&*+]{8,}$/;
+      if (!passwordRegex.test(password)) {
+        throw new ForbiddenException('invalid_password');
+      }
+    }
+
+    if(check_password) {
+      // 비밀번호 유효성 검사: 영문 + 숫자 + 특수문자 포함, 8자 이상
+      const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*+])[A-Za-z\d!@#$%^&*+]{8,}$/;
+      if (!passwordRegex.test(check_password)) {
+        throw new ForbiddenException('invalid_password');
+      }
+    }
+
+    if(password != check_password) {
+      throw new BadRequestException('password_mismatch');
+    }
+
+    const findUserPhoneAuthCode = await this.commonRepository.findPhoneAuthCode(phone);
+
+    if (!findUserPhoneAuthCode?.user_phone) {
+      throw new NotFoundException('not_found_phone');
+    }
+
+    if (findUserPhoneAuthCode?.code != auth_code) {
+      throw new BadRequestException('invalid_auth_code');
+    }
+
+    const userUuid = await this.commonRepository.getUserUuid(phone);
+
+    if(!userUuid) {
+      throw new NotFoundException('not_found_uuid');
+    }
+
+    if(userUuid.uuid != uuid) {
+      throw new BadRequestException('uuid_mismatch');
+    }
+
+    const hashPassword = this.hashService.hashPasswordWithNewSalt(password);
+
+    if(hashPassword) {
+      parameter.password = hashPassword.hashedPassword;
+      parameter.password_salt_key = hashPassword.salt;
+    }
+
+    await this.commonRepository.updateUserPassword(parameter.password, parameter.password_salt_key, uuid);
+
+    return 200;
+
+  }
 
 }

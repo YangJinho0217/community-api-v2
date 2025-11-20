@@ -1,6 +1,6 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
-export class getReferrerDto {
+export class GetReferrerDto {
 
   @IsString()
   @IsNotEmpty({ message: 'Required referrer' })

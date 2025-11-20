@@ -1,4 +1,5 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsIn } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class SignUpDto {
 

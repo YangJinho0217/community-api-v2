@@ -1,6 +1,6 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
-export class authCodeDto {
+export class AuthCodeDto {
 
   @IsString()
   @IsNotEmpty({ message : 'Required phone' })

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
+import { ActivityLogInterceptor } from './common/activity-log.interceptor';
+import { DatabaseService } from './database/database.service';
 
 // import { DatabaseM}
 
@@ -23,7 +25,11 @@ import { InitializeModule } from './module/initialize/initialize.module';
     InitializeModule
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService, 
+    DatabaseService,
+    ActivityLogInterceptor
+  ],
   
 })
 export class AppModule {}

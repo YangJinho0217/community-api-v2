@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { PoolConnection } from 'mysql2/promise';
 import { SignUpDto } from './dto/signUp.dto';
+import { RefreshTokenDto } from './dto/refreshToken.dto';
 
 @Injectable()
 export class CommonRepository {
@@ -18,7 +19,8 @@ export class CommonRepository {
     const sql = `
     SELECT id
     FROM user
-    WHERE uuid = ?`;
+    WHERE uuid = ?
+    AND is_deleted = 0`;
     const result = await this.db.query(sql, [uuid]);
     return result[0];
   }
@@ -27,7 +29,8 @@ export class CommonRepository {
     const sql = `
     SELECT nick_name
     FROM user
-    WHERE nick_name = ?`;
+    WHERE nick_name = ?
+    AND is_deleted = 0`;
     const result = await this.db.query(sql, [nickName]);
     return result[0];
   }
@@ -36,7 +39,8 @@ export class CommonRepository {
     const sql = `
     SELECT phone
     FROM user
-    WHERE phone = ?`;
+    WHERE phone = ?
+    AND is_deleted = 0`;
     const result = await this.db.query(sql, [phone]);
     return result[0];
   }
@@ -194,46 +198,195 @@ export class CommonRepository {
     return result[0];
   }
 
-  async insertPointTransaction(connection: PoolConnection, user_id : Number, type : String, point : Number) {
+  async insertPointTransactionReferrer(connection: PoolConnection, parameter : any) {
     const sql = `
     INSERT INTO user_point_transaction(user_id, date, type, count, total_point)
     VALUES (?,CURDATE(),?,?,?)
     ON DUPLICATE KEY UPDATE 
     count = count + VALUES(count),
     total_point = total_point + VALUES(total_point)`
-    const [result] = await connection.execute(sql, [user_id, type, 1, point]);
+    const [result] = await connection.execute(sql, [parameter.referrer, parameter.point_type, 1, parameter.point]);
     return result;
   }
 
-  async insertPointHistory(connection: PoolConnection, user_id : Number, type : String, point : Number) {
+  async insertPointHistoryReferrer(connection: PoolConnection, parameter : any) {
     const sql = `
     INSERT INTO user_point_history(user_id, point_type, type, point)
     VALUES (?,?,?,?)`;
-    const [result] = await connection.execute(sql, [user_id, 'earn', type, point]);
+    const [result] = await connection.execute(sql, [parameter.referrer, 'earn', parameter.point_type, parameter.point]);
     return result;
   }
 
-  async insertUserData(signUpDto : SignUpDto, referrerId : Number) {
+  async insertPointTransactionUser(connection: PoolConnection, parameter : any) {
+    const sql = `
+    INSERT INTO user_point_transaction(user_id, date, type, count, total_point)
+    VALUES (?,CURDATE(),?,?,?)
+    ON DUPLICATE KEY UPDATE 
+    count = count + VALUES(count),
+    total_point = total_point + VALUES(total_point)`
+    const [result] = await connection.execute(sql, [parameter.user_id, parameter.point_type, 1, parameter.point]);
+    return result;
+  }
 
-    console.log(signUpDto);
-    console.log(referrerId);
+  async insertPointHistoryUser(connection: PoolConnection, parameter : any) {
+    const sql = `
+    INSERT INTO user_point_history(user_id, point_type, type, point)
+    VALUES (?,?,?,?)`;
+    const [result] = await connection.execute(sql, [parameter.user_id, 'earn', parameter.point_type, parameter.point]);
+    return result;
+  }
+
+  async insertUserData(connection : PoolConnection, parameter : any) {
+
+    // console.log(parameter);
+    // return 1;
+    const sql = `
+    INSERT INTO user
+    (
+      type,
+      uuid,
+      user_name,
+      phone,
+      nick_name,
+      password,
+      password_hash_key,
+      user_level,
+      user_status,
+      referrer,
+      insignia_level,
+      terms,
+      privacy,
+      location_terms,
+      marketing
+    )
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+    const [result] = await connection.execute(sql,
+      [
+        parameter.type,
+        parameter.uuid,
+        parameter.user_name,
+        parameter.phone,
+        parameter.nick_name,
+        parameter.password,
+        parameter.password_hash_key,
+        parameter.user_level,
+        parameter.user_status,
+        parameter.referrer,
+        parameter.insignia_level,
+        parameter.terms,
+        parameter.privacy,
+        parameter.location_terms,
+        parameter.marketing
+      ]
+    ) as any;
+    
+    // ResultSetHeader에서 insertId 추출
+    return {
+      insertId: result.insertId,
+      affectedRows: result.affectedRows
+    };
+  }
+
+  async insertUserInsignia(connection : PoolConnection, parameter : any) {
+
+    const sql = `
+    INSERT INTO user_insignia(user_id, insignia_id, have_flag)
+    VALUES(?,?,?)
+    ON DUPLICATE KEY UPDATE have_flag = VALUES(have_flag)`;
+    
+    await connection.execute(sql, [parameter.user_id, 1, 1]);
+    await connection.execute(sql, [parameter.user_id, 2, 1]);
+    
+    return true;
   }
 
   // 트랜잭션으로 유저 포인트 업데이트(Transaction, History)
-  async insertSignUp(parameter : any) {
+  async insertSignUp(signupDto : SignUpDto, parameter : any) {
     return await this.db.transaction(async (connection) => {
 
-      // const referrer = parameter.referrer;
-      // const user_id = parameter.user_id;
-      // const type = parameter.type;
-      // const point = parameter.point;
+      // 트랜잭션 묶일 Insert Query
+      // 추천인 있을 시 추천인 에게 500 포인트 지급
+      // 추천인 있을 시 본인에게도 500 포인트 지급
+      // 회원가입
+      // 기본 휘장 추가
 
-      // if(referrer) {
-      //   // 추천인에게 포인트 지급. 근데 나한테도 보내줘야하기 때문에 회원가입 후 InsertId로 본인 지급 로직 필요.
-      //   await this.insertPointTransaction(connection, user_id, type, point)
-      //   await this.insertPointHistory(connection, user_id, type, point);
-      // }
+      // 회원가입 파라미터
+      let signupParam = {
+        type : parameter.type,
+        uuid : signupDto.uuid,
+        user_name : signupDto.user_name,
+        phone : signupDto.phone,
+        nick_name : signupDto.nick_name,
+        password : parameter.password,
+        password_hash_key : parameter.password_hash_key,
+        user_level : parameter.user_level,
+        user_status : parameter.user_status,
+        referrer : parameter.referrer_id,
+        insignia_level : parameter.insignia_level,
+        terms : signupDto.terms,
+        privacy : signupDto.privacy,
+        location_terms : signupDto.location_terms || 'N',  // undefined면 'N'으로 기본값 설정
+        marketing : signupDto.marketing || 'N',           // undefined면 'N'으로 기본값 설정
+        point_type : '' as string | null,
+        point : 500,
+        user_id : null as number | null
+      };
+
+      const signup = await this.insertUserData(connection, signupParam);
+      // 새로 생성된 사용자 ID를 파라미터에 설정
+      signupParam.user_id = signup.insertId;
+      
+      if(signupParam.referrer != null) {
+
+        signupParam.point_type = 'referrer';
+        await this.insertPointTransactionReferrer(connection, signupParam);
+        await this.insertPointHistoryReferrer(connection, signupParam);
+
+        signupParam.point_type = 'referrer_signup';
+        await this.insertPointTransactionUser(connection, signupParam);
+        await this.insertPointHistoryUser(connection, signupParam);
+      }
+
+      await this.insertUserInsignia(connection, signupParam);
 
     });
   }
+
+  async getRefreshToken(refreshToken : String) {
+    const sql = `
+    SELECT user_id
+    FROM user_session
+    WHERE refresh_session = ?`;
+    const [result] = await this.db.query(sql, [refreshToken]);
+    return result;
+  }
+
+  async updateUserTokenSet(accessToken : String, refreshToken : String, user_id : Number) {
+    const sql = `
+    UPDATE user_session
+    SET session = ?, refresh_session = ?
+    WHERE user_id = ?`;
+    const result = await this.db.query(sql, [accessToken, refreshToken, user_id]);
+    return result;
+  }
+
+  async getUserUuid(phone : String) {
+    const sql = `
+    SELECT uuid, created_at
+    FROM user
+    WHERE phone = ?
+    AND is_deleted = 0
+    LIMIT 1`;
+    const [result] = await this.db.query(sql, [phone]);
+    return result;
+  }
+
+  async updateUserPassword(password : String, password_salt : String, uuid : String) {
+    const sql = `
+    UPDATE user
+    SET password = ?, password_hash_key = ?
+    WHERE uuid = ?`;
+    await this.db.query(sql, [password, password_salt, uuid]);
+  }
+  
 }

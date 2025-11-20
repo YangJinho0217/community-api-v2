@@ -9,7 +9,14 @@ export class JwtAuthGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = request.headers.authorization?.replace('Bearer ', '');
+    
+    // Authorization 헤더에서 토큰 추출
+    let token = request.headers.authorization?.replace('Bearer ', '');
+    
+    // 헤더에 토큰이 없으면 쿠키에서 확인 (PC 클라이언트용)
+    if (!token && request.cookies) {
+      token = request.cookies.access_token;
+    }
 
     if (!token) {
       throw new UnauthorizedException('do_not_match_token');

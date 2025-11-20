@@ -3,7 +3,7 @@ import { InitializeService } from './initialize.service';
 import { AppVersionDto } from './dto/appVersion.dto';
 import { ApiResponse } from 'src/common/response.util';
 
-@Controller('/api/v1/initialize')
+@Controller('/api/v2/initialize')
 export class InitializeController {
 
     constructor(private readonly initializeService: InitializeService) {}
