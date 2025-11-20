@@ -5,10 +5,14 @@ import { HttpExceptionFilter } from './common/http-exceptionFilter';
 import { ActivityLogInterceptor } from './common/activity-log.interceptor';
 import { DatabaseService } from './database/database.service';
 import cookieParser from 'cookie-parser';
+import express from 'express';
 
 async function bootstrap() {
+  const server = express();
   const app = await NestFactory.create(AppModule);
 
+  // 프록시 환경에서 클라이언트 IP 제대로 받기
+  server.set('trust proxy', true);
   // 쿠키 파서 미들웨어 등록 (PC 클라이언트 토큰 읽기용)
   app.use(cookieParser());
 
@@ -25,6 +29,7 @@ async function bootstrap() {
   const databaseService = app.get(DatabaseService);
   app.useGlobalInterceptors(new ActivityLogInterceptor(databaseService));
   
+  // app.set
   await app.listen(process.env.PORT ?? 9090);
 }
 bootstrap();
