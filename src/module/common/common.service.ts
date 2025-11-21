@@ -455,6 +455,10 @@ export class CommonService {
     }
 
     const user = await this.commonRepository.getUserUuid(phone);
+    
+    if(!user) {
+      throw new NotFoundException('not_found_user');
+    }
     return user;
   }
 
