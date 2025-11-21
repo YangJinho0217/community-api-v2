@@ -16,7 +16,6 @@ import { AuthCodeDto } from './dto/authCode.dto';
 import { GetReferrerDto } from './dto/getReferrer.dto';
 import { SignUpDto } from './dto/signUp.dto';
 import { RefreshTokenDto } from './dto/refreshToken.dto';
-import { JwtAuthGuard } from 'src/auth/jwt/jwt-auth.guard';
 import { GetUserUuidDto } from './dto/getUserUuid.dto';
 import { GetUserPasswordDto } from './dto/getUserPassword.dto';
 import { UpdateUserPasswordDto } from './dto/updateUserPassword.dto';

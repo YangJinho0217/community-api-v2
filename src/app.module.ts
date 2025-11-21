@@ -3,7 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { ActivityLogInterceptor } from './common/activity-log.interceptor';
-import { DatabaseService } from './database/database.service';
+import { DatabaseModule } from './database/database.module';
 
 // import { DatabaseM}
 
@@ -14,6 +14,8 @@ import { DatabaseService } from './database/database.service';
 // Module
 import { CommonModule } from './module/common/common.module';
 import { InitializeModule } from './module/initialize/initialize.module';
+import { HomeController } from './module/home/home.controller';
+import { HomeModule } from './module/home/home.module';
 
 @Module({
   imports: [
@@ -21,13 +23,14 @@ import { InitializeModule } from './module/initialize/initialize.module';
       isGlobal: true,  // ✅ 전역으로 사용 가능
       envFilePath: '.env', // 루트에 .env 파일이 있으면 생략 가능
     }),
+    DatabaseModule,
     CommonModule,
-    InitializeModule
+    InitializeModule,
+    HomeModule
   ],
   controllers: [AppController],
   providers: [
     AppService, 
-    DatabaseService,
     ActivityLogInterceptor
   ],
   
