@@ -224,16 +224,137 @@ export class HomeRepository {
         return this.db.query(sql, queryParams);
     }
 
-  async findNews(
-    params : {
-        categoryCondition: string;
-        categoryParams: any[];
-    }) {
-
-        const sql = `
+  async findNews(params : {
+    categoryCondition: string;
+    categoryParams: any[];
+    newslimit : number | null;}) {
         
-        `
-    
+        const { categoryCondition, categoryParams, newslimit } = params;
+        const sql = `
+        SELECT thumnail,
+               title,
+               description,
+               originallink,
+               link,
+               pub_date,
+               category
+        FROM news
+        WHERE originallink IS NOT NULL
+        ${categoryCondition}
+        ORDER BY pub_date DESC
+        LIMIT ${newslimit || 1}`;
+
+        const queryParams = [
+            ...categoryParams
+        ]
+
+        return this.db.query(sql, queryParams);
+  }
+
+  async findPostTopTen(params : {
+    postlimit : number | 0}) {
+        const { postlimit } = params;
+        const sql = `
+        SELECT A.id,
+               A.type,
+               A.title,
+               A.content,
+               A.views_count,
+               COUNT(DISTINCT C.id) AS post_comment_count,
+               COUNT(DISTINCT L.id) AS post_like,
+               PI.img,
+               (
+                (
+                    A.views_count * 1 +
+                    COUNT(DISTINCT C.id) * 5 +
+                    COUNT(DISTINCT L.id) * 10
+                ) / POWER(TIMESTAMPDIFF(HOUR, A.created_at, NOW()) + 2, 1.5)
+            ) AS score
+        FROM post A
+        LEFT JOIN post_comment C 
+            ON C.post_id = A.id 
+            AND C.parent_comment_id IS NULL 
+            AND C.is_deleted = 0 
+            AND C.is_blind = 0
+        LEFT JOIN post_like L 
+            ON L.post_id = A.id 
+            AND L.is_liked = 1
+        LEFT JOIN (
+            SELECT post_id, img
+            FROM post_img
+            ORDER BY created_at ASC
+        ) PI ON PI.post_id = A.id
+        WHERE A.is_deleted = 0 
+        AND A.is_blind = 0
+        GROUP BY A.id, A.title, A.content, A.views_count, PI.img
+        ORDER BY score DESC
+        LIMIT ${postlimit || 1}`;
+        const result = await this.db.query(sql, []);
+        return result;
+  }
+
+  async findInjury(params : { 
+    user_id : number | 0;
+    categoryCondition: string;
+    categoryParams: any[];
+    injurylimit : number | 0;}) {
+        const { user_id, categoryCondition, categoryParams, injurylimit } = params;
+        const sql = `
+        SELECT A.id,
+               A.type,
+               A.title,
+               B.nick_name,
+               A.created_at,
+               A.edited_at,
+               A.views_count
+        FROM post A
+        JOIN user B ON A.user_id = B.id
+        LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = A.user_id
+        LEFT JOIN user_block UB2 ON UB2.user_id = A.user_id AND UB2.block_user_id = ?
+        WHERE A.type = 'injury'
+          AND A.is_deleted  = 0
+          AND A.is_blind    = 0
+          AND B.is_deleted  = 0
+          AND B.user_status = 0
+          AND UB1.block_user_id IS NULL
+          AND UB2.block_user_id IS NULL
+        ${categoryCondition}
+        ORDER BY A.edited_at DESC
+        LIMIT ${injurylimit || 1}`;
+        const result = await this.db.query(sql, [user_id, user_id, ...categoryParams]);
+        return result;
+  }
+
+  async findLineup(params : { 
+    user_id : number | 0;
+    categoryCondition: string;
+    categoryParams: any[];
+    injurylimit : number | 0;}) {
+        const { user_id, categoryCondition, categoryParams, injurylimit } = params;
+        const sql = `
+        SELECT A.id,
+               A.type,
+               A.title,
+               B.nick_name,
+               A.created_at,
+               A.edited_at,
+               A.views_count
+        FROM post A
+        JOIN user B ON A.user_id = B.id
+        LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = A.user_id
+        LEFT JOIN user_block UB2 ON UB2.user_id = A.user_id AND UB2.block_user_id = ?
+        WHERE A.type = 'lineup'
+          AND A.is_deleted  = 0
+          AND A.is_blind    = 0
+          AND B.is_deleted  = 0
+          AND B.user_status = 0
+          AND UB1.block_user_id IS NULL
+          AND UB2.block_user_id IS NULL
+        ${categoryCondition}
+        ORDER BY A.edited_at DESC
+        LIMIT ${injurylimit || 1}`;
+        const result = await this.db.query(sql, [user_id, user_id, ...categoryParams]);
+        return result;
   }
   
 }
