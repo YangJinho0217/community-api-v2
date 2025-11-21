@@ -10,8 +10,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
-    // const host = this.configService.get<string>('DEV_DB_HOST')!;
-    const host = this.configService.get<string>('LOCAL_DB_HOST');
+    const host = this.configService.get<string>('DEV_DB_HOST')!;
+    // const host = this.configService.get<string>('LOCAL_DB_HOST');
     const user = this.configService.get<string>('DEV_DB_USER')!;
     const password = this.configService.get<string>('DEV_DB_PASSWORD')!;
     const database = this.configService.get<string>('DEV_DB_DATABASE')!;
