@@ -261,6 +261,7 @@ export class CommonService {
   async getUuid(getUuidDto: GetUuidDto) {
 
     const uuid = getUuidDto.uuid;
+    const type = getUuidDto.type;
 
     // uuid check
     const uuidRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{5,20}$/;
@@ -270,12 +271,19 @@ export class CommonService {
 
     const findUuid = await this.commonRepository.findUserUuid(uuid);
 
-    if (findUuid?.id) {
-      throw new ConflictException('uuid_already_exists');
+    if(type == 'normal') {
+      if(!findUuid) {
+        throw new NotFoundException('not_found_uuid');
+      }
+    }
+
+    if(type == 'signup') {
+      if(findUuid?.id) {
+        throw new ConflictException('uuid_already_exists');
+      }
     }
 
     return 200;
-
   }
 
   async getNickName(getNickNameDto: GetNickNameDto) {
