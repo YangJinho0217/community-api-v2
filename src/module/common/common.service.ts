@@ -455,7 +455,7 @@ export class CommonService {
     }
 
     const user = await this.commonRepository.getUserUuid(phone);
-    
+
     if(!user) {
       throw new NotFoundException('not_found_user');
     }
@@ -512,6 +512,7 @@ export class CommonService {
       password : '',
       password_salt_key : ''
     };
+
     const uuid = updateUserPasswordDto.uuid;
     const phone = updateUserPasswordDto.phone;
     const auth_code = updateUserPasswordDto.auth_code;
@@ -571,6 +572,23 @@ export class CommonService {
 
     if(userUuid.uuid != uuid) {
       throw new BadRequestException('uuid_mismatch');
+    }
+
+    // 현재 사용자 정보 조회 (현재 비밀번호 확인용)
+    const currentUser = await this.commonRepository.findUserOne(uuid);
+    if (!currentUser || currentUser.length < 1) {
+      throw new NotFoundException('not_found_user');
+    }
+
+    // 현재 비밀번호와 새 비밀번호가 동일한지 확인
+    const isSamePassword = this.hashService.validatePassword(
+      password,
+      currentUser[0].password_hash_key,
+      currentUser[0].password
+    );
+
+    if (isSamePassword) {
+      throw new BadRequestException('same_password');
     }
 
     const hashPassword = this.hashService.hashPasswordWithNewSalt(password);

@@ -48,6 +48,7 @@ export class CommonRepository {
   async findUserOne(uuid : String) {
     const sql = `
     SELECT A.id,
+           A.type AS user_type,
            A.uuid,
            A.user_name, 
            A.phone, 
