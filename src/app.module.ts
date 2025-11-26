@@ -16,6 +16,7 @@ import { CommonModule } from './module/common/common.module';
 import { InitializeModule } from './module/initialize/initialize.module';
 import { HomeController } from './module/home/home.controller';
 import { HomeModule } from './module/home/home.module';
+import { SearchModule } from './module/search/search.module';
 
 @Module({
   imports: [
@@ -26,7 +27,8 @@ import { HomeModule } from './module/home/home.module';
     DatabaseModule,
     CommonModule,
     InitializeModule,
-    HomeModule
+    HomeModule,
+    SearchModule
   ],
   controllers: [AppController],
   providers: [

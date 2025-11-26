@@ -13,26 +13,36 @@ export class SearchRpository {
     return this.db.query(sql);
   }
 
-  async findUserUuid(uuid : String) {
+  async findUserCurrentSearch(user_id : Number) {
     const sql = `
-    SELECT id
-    FROM user
-    WHERE uuid = ?`;
-    const result = await this.db.query(sql, [uuid]);
-    return result[0];
+    SELECT search
+    FROM (
+        SELECT search, created_at,
+            ROW_NUMBER() OVER (PARTITION BY search ORDER BY created_at DESC) AS rn
+        FROM user_search
+        WHERE user_id = ?
+    ) AS ranked
+    WHERE rn = 1
+    ORDER BY created_at DESC
+    LIMIT 10`;
+    const result = await this.db.query(sql, [user_id]);
+    return result;
   }
 
-  async findAppVersion(device_type : String, version : String) {
+  async findPopularSearch(scheme : String) {
     const sql = `
-    SELECT device_type,
-           version,
-           is_inspc
-    FROM app_version
-    WHERE device_type = ?
-      AND version = ?`
-
-    const result = await this.db.query(sql, [device_type, version]);
-    return result[0];
+    SELECT ROW_NUMBER() OVER (ORDER BY ranks ASC) AS seq
+         , ranks
+         , search
+         , diff
+    FROM ${scheme}.search_stat
+    WHERE timestamp = (SELECT MAX(timestamp) FROM ${scheme}.search_stat)
+    AND is_deleted = 0
+    ORDER BY ranks ASC
+    LIMIT 10`;
+    
+    const result = await this.db.query(sql, []);
+    return result;
   }
 
 }

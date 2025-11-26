@@ -1,6 +1,7 @@
-import { Controller, UseGuards } from '@nestjs/common';
+import { Controller, Req, UseGuards, Get } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { OptionalJwtAuthGuard } from 'src/auth/jwt/optional-jwt-auth.guard';
+import { ApiResponse } from 'src/common/response.util';
 
 @Controller("/api/v2/search")
 export class SearchController {
@@ -10,7 +11,12 @@ export class SearchController {
 
     ) {}
 
-    // @UseGuards(OptionalJwtAuthGuard)
-    // @Get("/current_search")
-    // async getCurrentSearch(@Query())
+    // 검색 페이지 조회
+    @UseGuards(OptionalJwtAuthGuard)
+    @Get("/set")
+    async getSearchSet(@Req() req) {
+        const user = req.user;
+        const data = await this.searchService.getSearchSet(user);
+        return ApiResponse.success(data, "Get SearchSet Success");
+    }
 }

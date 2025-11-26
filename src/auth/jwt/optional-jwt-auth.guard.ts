@@ -39,10 +39,10 @@ export class OptionalJwtAuthGuard implements CanActivate {
     } catch (err) {
       console.log('토큰 검증 실패:', err.message);
       
-      // 만료된 토큰은 에러로 처리하고 싶다면 주석 해제
-      // if (err.message === 'Expired_token') {
-      //   throw err;
-      // }
+      // 만료된 토큰은 에러로 처리 (클라이언트가 refresh token으로 재발급 받도록)
+      if (err.message === 'Expired_token') {
+        throw err;
+      }
       
       // 그 외의 경우는 null로 처리하고 통과
       request.user = null;

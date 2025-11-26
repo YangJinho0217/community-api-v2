@@ -213,7 +213,7 @@ export class CommonService {
     await this.commonRepository.updateFcmTokenAndInsertSession(session_parameter);
 
     const result_user = {
-      user_id: user[0].id,
+      // user_id: user[0].id,
       uuid: user[0].uuid,
       user_type: user[0].user_type,
       user_name: user[0].user_name,
@@ -274,7 +274,7 @@ export class CommonService {
     if(findUuid?.id) {
       throw new ConflictException('uuid_already_exists');
     }
-    
+
     if(type == 'normal') {
       if(!findUuid) {
         throw new NotFoundException('not_found_uuid');

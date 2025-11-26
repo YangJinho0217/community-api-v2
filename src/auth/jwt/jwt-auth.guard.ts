@@ -1,11 +1,11 @@
 // src/auth/jwt/jwt-auth.guard.ts
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
+import { AuthService } from '../auth.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(private readonly authService: AuthService) {}
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
@@ -23,11 +23,11 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const decoded = this.jwtService.verify(token);
+      const decoded = this.authService.verifyToken(token);
       request.user = decoded; // 요청 객체에 user 정보 추가
       return true;
     } catch (err) {
-      if (err.name === 'TokenExpiredError') {
+      if (err.message === 'Expired_token') {
         throw new UnauthorizedException('Expired_token');
       }
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
