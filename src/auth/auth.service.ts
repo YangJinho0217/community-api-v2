@@ -39,14 +39,14 @@ export class AuthService {
   verifyToken(token: string) {
     try {
       const secret = this.configService.get<string>('DEV_JWT_SECRET_KEY');
-      console.log('🔑 토큰 검증 시작:', { secret: secret?.substring(0, 10) + '...', tokenLength: token.length });
+      // console.log('🔑 토큰 검증 시작:', { secret: secret?.substring(0, 10) + '...', tokenLength: token.length });
       
       const result = this.jwtService.verify(token, {secret});
-      console.log('✅ 토큰 검증 성공:', { user_id: result.user_id, exp: new Date(result.exp * 1000) });
+      // console.log('✅ 토큰 검증 성공:', { user_id: result.user_id, exp: new Date(result.exp * 1000) });
       
       return result;
     } catch (err) {
-      console.log('❌ 토큰 검증 실패:', { name: err.name, message: err.message });
+      // console.log('❌ 토큰 검증 실패:', { name: err.name, message: err.message });
       
       if (err.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Expired_token');

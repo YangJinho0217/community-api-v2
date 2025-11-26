@@ -7,12 +7,14 @@ import { GetNewsDto } from './dto/getNews.dto';
 import { GetPostTopTenDto } from './dto/getPostTopTen.dto';
 import { GetInjuryDto } from './dto/getInjury.dto';
 import { GetLineupDto } from './dto/getLineup.dto';
+import { SearchRpository } from '../search/search.repository';
 
 @Injectable()
 export class HomeService {
 
     constructor (
-        readonly homeRepository : HomeRepository 
+        readonly homeRepository : HomeRepository,
+        readonly searchRepository : SearchRpository
     ) {}
 
     // 팝업 조회 (단독 메서드)
@@ -185,5 +187,14 @@ export class HomeService {
             injury,
             lineup
         };
+    }
+
+    async getSearchRolling() {
+        
+        const scheme = 'feedbag_search_stat';
+        const search_popular = await this.searchRepository.findPopularSearch(scheme);
+
+        return search_popular;
+
     }
 }

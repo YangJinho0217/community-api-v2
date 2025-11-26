@@ -42,57 +42,70 @@ export class HomeRepository {
         
         const sql = `
         SELECT A.id,
-                TDH.name AS home_team_name,
-                TDH.kor_name AS kor_home_team_name,
-                TDH.logo AS home_team_logo,
-                TDA.name AS away_team_name,
-                TDA.kor_name AS kor_away_team_name,
-                TDA.logo AS away_team_logo,
-                STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i') AS timeinfo,
-                TD.match_status,
-                TMS.status_description,
-                B.nick_name,
-                B.img,
-                TD.category,
-                CASE WHEN B.user_level = '01' THEN '일반'
-                    WHEN B.user_level = '02' THEN '아마추어'
-                    WHEN B.user_level = '03' THEN '프로'
-                    WHEN B.user_level = '04' THEN '레전드'
-                    ELSE null END AS user_level_name
+               TDC.name AS competition_name,
+               TDC.kor_name AS kor_competition_name,
+               TDC.logo AS competition_logo,
+               TDH.name AS home_team_name,
+               TDH.kor_name AS kor_home_team_name,
+               TDH.logo AS home_team_logo,
+               TDA.name AS away_team_name,
+               TDA.kor_name AS kor_away_team_name,
+               TDA.logo AS away_team_logo,
+               STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i') AS timeinfo,
+               TD.match_status,
+               TMS.status_description,
+               B.nick_name,
+               B.img,
+               UI.img AS insignia_img,
+               TD.category,
+               CASE WHEN B.user_level = '01' THEN '일반'
+                   WHEN B.user_level = '02' THEN '아마추어'
+                   WHEN B.user_level = '03' THEN '프로'
+                   WHEN B.user_level = '04' THEN '레전드'
+                   ELSE null END AS user_level_name,
+               AP.winner_id,
+               CASE 
+                   WHEN AP.winner_id = TD.home_team_id THEN TDH.name
+                   WHEN AP.winner_id = TD.away_team_id THEN TDA.name
+                   ELSE 'draw'
+               END AS winner_name,
+               CASE 
+                   WHEN AP.winner_id = TD.home_team_id THEN TDH.kor_name
+                   WHEN AP.winner_id = TD.away_team_id THEN TDA.kor_name
+                   ELSE 'draw'
+               END AS kor_winner_name
         FROM post A
         JOIN user B ON A.user_id = B.id
+        JOIN insignia UI ON B.insignia_level = UI.insignia_level
         JOIN ts_daily_match TD ON A.match_id = TD.id
         JOIN ts_competition TDC ON TD.competition_id = TDC.competition_id
         JOIN ts_team TDH ON TD.home_team_id = TDH.team_id
         JOIN ts_team TDA ON TD.away_team_id = TDA.team_id
         JOIN ts_match_status TMS ON TD.match_status = TMS.status_code AND TD.category = TMS.category
+        LEFT JOIN analyze_pick AP ON AP.post_id = A.id
         LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = A.user_id
         LEFT JOIN user_block UB2 ON UB2.user_id = A.user_id AND UB2.block_user_id = ?
         WHERE A.is_deleted = 0
-            AND B.type = 'basic'
-            AND A.is_blind = 0
-            AND A.type = 'analyze'
-            AND A.match_id IS NOT NULL
-            AND B.is_deleted = 0
-            AND UB1.block_user_id IS NULL
-            AND UB2.block_user_id IS NULL
-            AND TD.matchtime BETWEEN ? AND ?
-            -- 시간 조건 완화: 당일 경기는 모두 포함 (과거 경기도 분석글 표시)
-            -- AND TD.matchtime >= CAST(DATE_FORMAT(UTC_TIMESTAMP(), '%Y%m%d%H%i') AS UNSIGNED)
-            -- 경기 상태 조건 완화: 시작 전(1)과 진행중 상태도 포함
-            AND TD.match_status IN (1, 2, 3, 4, 5, 6, 7, 8)
-            ${categoryCondition}
-            AND (
-                A.user_id = ?
-                OR A.allowable_range = 'public'
-                OR (
-                    A.allowable_range = 'follower'
-                    AND EXISTS (
-                        SELECT 1 FROM follow F
-                        WHERE F.user_id = ? AND F.following_id = A.user_id AND F.is_followed = 1
-                    )
+        AND A.is_blind = 0
+        AND A.type = 'analyze'
+        AND A.match_id IS NOT NULL
+        AND B.is_deleted = 0
+        AND UB1.block_user_id IS NULL
+        AND UB2.block_user_id IS NULL
+        AND TD.matchtime BETWEEN ? AND ?
+        AND TD.match_status IN (1, 2, 3, 4, 5, 6, 7, 8)
+        ${categoryCondition}
+        AND (
+            A.user_id = ?
+            OR A.allowable_range = 'public'
+            OR (
+                A.allowable_range = 'follower'
+                AND EXISTS (
+                    SELECT 1 FROM follow F
+                    WHERE F.user_id = ? AND F.following_id = A.user_id AND F.is_followed = 1
                 )
             )
+        )
         ORDER BY 
             CASE 
                 -- ⚽ 축구 진행중

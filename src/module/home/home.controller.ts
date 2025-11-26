@@ -80,4 +80,10 @@ export class HomeController {
         const data = await this.homeService.getHome(getHomeDto, user);
         return ApiResponse.success(data, "Get Home Success");
     }
+
+    @Get("/auth/search_popular")
+    async getSearchRolling() {
+        const data = await this.homeService.getSearchRolling();
+        return ApiResponse.success(data, "Get Search Popular Success"); 
+    }
 }
