@@ -271,27 +271,20 @@ export class CommonService {
 
     const findUuid = await this.commonRepository.findUserUuid(uuid);
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
     if(findUuid?.id) {
       throw new ConflictException('uuid_already_exists');
-=======
->>>>>>> 01d63fe51d8077675ed9887a1735b69fd695d8e4
+    }
+    
     if(type == 'normal') {
       if(!findUuid) {
         throw new NotFoundException('not_found_uuid');
       }
-<<<<<<< HEAD
     }
 
     if(type == 'signup') {
       if(findUuid?.id) {
         throw new ConflictException('uuid_already_exists');
       }
-=======
->>>>>>> 75ed3dae3c1dfcffabe643cff55616e026e8c77f
->>>>>>> 01d63fe51d8077675ed9887a1735b69fd695d8e4
     }
 
     if(type == 'signup') {
