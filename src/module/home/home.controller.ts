@@ -7,6 +7,7 @@ import { GetNewsDto } from './dto/getNews.dto';
 import { GetPostTopTenDto } from './dto/getPostTopTen.dto';
 import { GetInjuryDto } from './dto/getInjury.dto';
 import { GetLineupDto } from './dto/getLineup.dto';
+import { GetAnalyzeMatchDto } from './dto/getAnalyzeMatch.dto';
 import { OptionalJwtAuthGuard } from '../../auth/jwt/optional-jwt-auth.guard';
 import { ApiResponse } from 'src/common/response.util';
 
@@ -81,9 +82,18 @@ export class HomeController {
         return ApiResponse.success(data, "Get Home Success");
     }
 
-    @Get("/auth/search_popular")
+    @Get("/search_popular")
     async getSearchRolling() {
         const data = await this.homeService.getSearchRolling();
         return ApiResponse.success(data, "Get Search Popular Success"); 
+    }
+
+    // 분석 매치 조회
+    @UseGuards(OptionalJwtAuthGuard)
+    @Get("/analyze-match")
+    async getAnalyzeMatch(@Query() getAnalyzeMatchDto: GetAnalyzeMatchDto, @Req() req) {
+        const user = req.user;
+        const data = await this.homeService.getAnalyzeMatch(getAnalyzeMatchDto, user);
+        return ApiResponse.success(data, "Get Analyze Match Success");
     }
 }

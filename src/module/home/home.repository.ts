@@ -370,4 +370,218 @@ export class HomeRepository {
         return result;
   }
   
+  // 1단계: 1:1 매칭된 경기 ID들 조회 (날짜별로 2개씩)
+  async findValidMatchIds(params: {
+    user_id: number | null;
+    categoryCondition: string;
+    categoryParams: any[];
+  }) {
+    const { user_id, categoryCondition, categoryParams } = params;
+
+    const sql = `
+      SELECT match_id, date_priority FROM (
+        SELECT AP.match_id,
+               CASE 
+                 WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN 1
+                 WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = CURDATE() THEN 2
+                 WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 3
+               END AS date_priority,
+               MAX(P.views_count) AS max_views,
+               ROW_NUMBER() OVER (
+                 PARTITION BY 
+                   CASE 
+                     WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN 1
+                     WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = CURDATE() THEN 2
+                     WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 3
+                   END 
+                 ORDER BY MAX(P.views_count) DESC
+               ) AS match_rank
+        FROM analyze_pick AP
+        JOIN post P ON AP.post_id = P.id
+        JOIN user U ON P.user_id = U.id
+        JOIN ts_daily_match TD ON AP.match_id = TD.id
+        LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = P.user_id
+        LEFT JOIN user_block UB2 ON UB2.user_id = P.user_id AND UB2.block_user_id = ?
+        WHERE P.is_deleted = 0
+        ${categoryCondition}
+        AND P.type = 'analyze'
+        AND U.is_deleted = 0
+        AND U.user_status = 0
+        AND UB1.block_user_id IS NULL
+        AND UB2.block_user_id IS NULL
+        AND DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) IN (
+          DATE_SUB(CURDATE(), INTERVAL 1 DAY),
+          CURDATE(),
+          DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+        )
+        AND (
+            P.user_id = ?
+            OR P.allowable_range = 'public'
+            OR (
+                P.allowable_range = 'follower'
+                AND EXISTS (
+                    SELECT 1 FROM follow F
+                    WHERE F.user_id = ? AND F.following_id = P.user_id AND F.is_followed = 1
+                )
+            )
+        )
+        GROUP BY AP.match_id
+        HAVING COUNT(DISTINCT P.user_id) = 2
+      ) ranked_matches
+      WHERE match_rank <= 2
+      ORDER BY date_priority
+    `;
+
+    const queryParams = [
+      user_id ?? null,
+      user_id ?? null,
+      ...categoryParams,
+      user_id ?? null,
+      user_id ?? null
+    ];
+
+    return this.db.query(sql, queryParams);
+  }
+
+  // 2단계: 특정 경기들의 분석글 조회
+  async findAnalyzePostsByMatchIds(matchIds: number[], user_id: number | null) {
+    if (matchIds.length === 0) return [];
+
+    const placeholders = matchIds.map(() => '?').join(',');
+    
+    const sql = `
+      SELECT A.id AS post_id,
+             A.match_id,
+             A.views_count,
+             B.nick_name,
+             B.img,
+             B.type,
+             C.level_name,
+             A.title,
+             A.content,
+             CASE 
+                 WHEN AP.winner_id = TD.home_team_id THEN TDH.logo
+                 WHEN AP.winner_id = TD.away_team_id THEN TDA.logo
+                 ELSE null
+             END AS winner_logo,
+             CASE 
+                 WHEN AP.winner_id = TD.home_team_id THEN TDH.name
+                 WHEN AP.winner_id = TD.away_team_id THEN TDA.name
+                 ELSE 'draw'
+             END AS winner_name,
+             CASE 
+                 WHEN AP.winner_id = TD.home_team_id THEN TDH.kor_name
+                 WHEN AP.winner_id = TD.away_team_id THEN TDA.kor_name
+                 ELSE 'draw'
+             END AS kor_winner_name,
+             A.created_at,
+             CASE 
+               WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN 1
+               WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = CURDATE() THEN 2
+               WHEN DATE(STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i')) = DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 3
+               ELSE 4
+             END AS date_priority
+      FROM post A
+      JOIN user B ON A.user_id = B.id
+      JOIN level C ON B.user_level = C.level_code
+      JOIN analyze_pick AP ON AP.post_id = A.id
+      JOIN ts_daily_match TD ON AP.match_id = TD.id
+      JOIN ts_team TDH ON TD.home_team_id = TDH.team_id
+      JOIN ts_team TDA ON TD.away_team_id = TDA.team_id
+      LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = A.user_id
+      LEFT JOIN user_block UB2 ON UB2.user_id = A.user_id AND UB2.block_user_id = ?
+      WHERE A.is_deleted = 0
+      AND A.type = 'analyze'
+      AND B.is_deleted = 0
+      AND B.user_status = 0
+      AND UB1.block_user_id IS NULL
+      AND UB2.block_user_id IS NULL
+      AND A.match_id IN (${placeholders})
+      AND (
+          A.user_id = ?
+          OR A.allowable_range = 'public'
+          OR (
+              A.allowable_range = 'follower'
+              AND EXISTS (
+                  SELECT 1 FROM follow F
+                  WHERE F.user_id = ? AND F.following_id = A.user_id AND F.is_followed = 1
+              )
+          )
+      )
+      ORDER BY date_priority, A.views_count DESC, A.created_at DESC
+    `;
+
+    const queryParams = [
+      user_id ?? null,
+      user_id ?? null,
+      ...matchIds,
+      user_id ?? null,
+      user_id ?? null
+    ];
+
+    return this.db.query(sql, queryParams);
+  }
+
+  // 메인 함수: 위 두 함수를 조합
+  async findAnalyzeMatch(params: {
+    user_id: number | null;
+    categoryCondition: string;
+    categoryParams: any[];
+  }) {
+    // 1단계: 유효한 매치 ID들 조회
+    const validMatches = await this.findValidMatchIds(params);
+    
+    if (validMatches.length === 0) {
+      return [];
+    }
+
+    // 2단계: 해당 매치들의 분석글 조회
+    const matchIds = validMatches.map(match => match.match_id);
+    return await this.findAnalyzePostsByMatchIds(matchIds, params.user_id);
+  }
+
+  async findSportsInfoByMatchIds(matchIds: number[]) {
+    if (matchIds.length === 0) return [];
+
+    const placeholders = matchIds.map(() => '?').join(',');
+
+    const sql = `
+      SELECT TD.id AS match_id,
+             TC.name AS competition_name,
+             TC.kor_name AS kor_competition_name,
+             TC.logo AS competition_logo,
+             TDH.name AS home_team_name,
+             TDH.kor_name AS kor_home_team_name,
+             TDH.logo AS home_team_logo,
+             TDA.name AS away_team_name,
+             TDA.kor_name AS kor_away_team_name,
+             TDA.logo AS away_team_logo,
+             STR_TO_DATE(CAST(TD.matchtime AS CHAR), '%Y%m%d%H%i') AS timeinfo
+      FROM ts_daily_match TD
+      JOIN ts_competition TC ON TD.competition_id = TC.competition_id
+      JOIN ts_team TDH ON TD.home_team_id = TDH.team_id
+      JOIN ts_team TDA ON TD.away_team_id = TDA.team_id
+      WHERE TD.id IN (${placeholders})
+    `;
+
+    return this.db.query(sql, matchIds);
+  }
+
+  async findPostImagesByPostIds(postIds: number[]) {
+    if (postIds.length === 0) return [];
+
+    const placeholders = postIds.map(() => '?').join(',');
+
+    const sql = `
+      SELECT id, 
+             post_id, 
+             img
+      FROM post_img
+      WHERE post_id IN (${placeholders})
+      AND is_deleted = 0
+      ORDER BY post_id ASC
+    `;
+
+    return this.db.query(sql, postIds);
+  }
 }

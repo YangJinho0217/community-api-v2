@@ -7,6 +7,7 @@ import { GetNewsDto } from './dto/getNews.dto';
 import { GetPostTopTenDto } from './dto/getPostTopTen.dto';
 import { GetInjuryDto } from './dto/getInjury.dto';
 import { GetLineupDto } from './dto/getLineup.dto';
+import { GetAnalyzeMatchDto } from './dto/getAnalyzeMatch.dto';
 import { SearchRpository } from '../search/search.repository';
 
 @Injectable()
@@ -196,5 +197,104 @@ export class HomeService {
 
         return search_popular;
 
+    }
+
+    async getAnalyzeMatch(getAnalyzeMatchDto: GetAnalyzeMatchDto, user?: any) {
+        const { category } = getAnalyzeMatchDto;
+        const user_id = user?.user_id || null;
+
+        // 카테고리 조건 처리
+        let categoryCondition = '';
+        let categoryParams: string[] = [];
+
+        if (category && category !== 'all') {
+            categoryCondition = 'AND TD.category = ?';
+            categoryParams = [category];
+        }
+
+        // 분석 포스트 조회
+        const selectedAnalyze = await this.homeRepository.findAnalyzeMatch({
+            user_id,
+            categoryCondition,
+            categoryParams
+        });
+
+        if (selectedAnalyze.length === 0) {
+            return { matches: [] };
+        }
+
+        // post_id와 match_id 추출
+        const postIds = selectedAnalyze.map(item => item.post_id);
+        const matchIds = selectedAnalyze.map(item => item.match_id).filter(Boolean);
+
+        // 병렬로 스포츠 정보와 포스트 이미지 조회
+        const [selectedSports] = await Promise.all([
+            this.homeRepository.findSportsInfoByMatchIds(matchIds)
+        ]);
+
+        // 포스트 이미지 맵 생성
+        // const postImgMap = postImg.reduce((acc, item) => {
+        //     if (!acc[item.post_id]) acc[item.post_id] = [];
+        //     acc[item.post_id].push({ id: item.id, url: item.img });
+        //     return acc;
+        // }, {});
+
+        // 스포츠 정보 맵 생성 (match_id 기준)
+        const sportsMap = new Map((selectedSports || []).map(s => [
+            s.match_id, {
+                timeinfo: s.timeinfo,
+                sports_match_id: s.match_id,
+                competition_name: s.competition_name,
+                kor_competition_name: s.kor_competition_name,
+                competition_logo: s.competition_logo,
+                home_team_name: s.home_team_name,
+                kor_home_team_name: s.kor_home_team_name,
+                home_team_logo: s.home_team_logo,
+                away_team_name: s.away_team_name,
+                kor_away_team_name: s.kor_away_team_name,
+                away_team_logo: s.away_team_logo
+            }
+        ]));
+
+        // 유저 vs 유저 매칭 로직
+        const groupedByMatch = new Map();
+
+        for (const post of selectedAnalyze) {
+            const matchId = post.match_id;
+            if (!matchId) continue;
+
+            if (!groupedByMatch.has(matchId)) {
+                groupedByMatch.set(matchId, []);
+            }
+            groupedByMatch.get(matchId).push(post);
+        }
+
+        // 결과 구조: 각 경기별 페어
+        const pairedMatches: any[] = [];
+
+        for (const [matchId, posts] of groupedByMatch.entries()) {
+            const sports = sportsMap.get(matchId) || null;
+
+            // 3명 이상이면 최신 2명만 (created_at DESC 기준)
+            const trimmedPosts = posts.slice(0, 2);
+
+            // 정확히 2명일 때만 표시
+            if (trimmedPosts.length === 2) {
+                pairedMatches.push({
+                    sports_match_id: matchId,
+                    sports,
+                    users: trimmedPosts.map(u => {
+                        const { match_id, ...rest } = u; // match_id 제거
+                        return {
+                            ...rest,
+                            // files: postImgMap[u.post_id] || []
+                        };
+                    })
+                });
+            }
+        }
+
+        // 상위 10개만 반환
+        return { matches: pairedMatches.slice(0, 10) };
     }
 }
