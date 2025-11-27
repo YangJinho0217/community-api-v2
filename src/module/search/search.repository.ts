@@ -14,7 +14,7 @@ export class SearchRpository {
     return this.db.query(sql);
   }
 
-  async findUserCurrentSearch(user_id : Number) {
+  async findUserCurrentSearch(user_id : number) {
     const sql = `
     SELECT search
     FROM (
@@ -30,7 +30,7 @@ export class SearchRpository {
     return result;
   }
 
-  async findPopularSearch(scheme : String) {
+  async findPopularSearch(scheme : string) {
     const sql = `
     SELECT ROW_NUMBER() OVER (ORDER BY ranks ASC) AS seq
          , ranks
@@ -46,7 +46,7 @@ export class SearchRpository {
     return result;
   }
 
-  async findForbiddenSearch(search : String) {
+  async findForbiddenSearch(search : string) {
     const sql = `
     SELECT search
     FROM search_forbidden
@@ -55,14 +55,14 @@ export class SearchRpository {
     return result;
   }
 
-  async createUserSearch(connection : PoolConnection, user_id : Number, search : String) {
+  async createUserSearch(connection : PoolConnection, user_id : number, search : string) {
     const sql = `
     INSERT INTO user_search(user_id, search)
     VALUES(?,?)`;
     await connection.execute(sql, [user_id, search]);
   }
 
-  async createSearchCount(connection : PoolConnection, search : String) {
+  async createSearchCount(connection : PoolConnection, search : string) {
     const sql = `
     INSERT INTO search(search, count)
     VALUES(?,?)
@@ -70,7 +70,7 @@ export class SearchRpository {
     await connection.execute(sql, [search, 1]);
   }
 
-  async createSearchTransaction(user_id : Number, search : String) {
+  async createSearchTransaction(user_id : number, search : string) {
     return await this.db.transaction(async (connection) => {
 
       if(user_id) {
@@ -81,7 +81,7 @@ export class SearchRpository {
     });
   }
 
-  async findSportsDailyMatch(search : String, user_id : Number) {
+  async findSportsDailyMatch(search : string, user_id : number) {
     const sql = `
     SELECT STR_TO_DATE(CAST(A.matchtime AS CHAR), '%Y%m%d%H%i') AS timeinfo,
            A.id AS match_id,
@@ -90,6 +90,8 @@ export class SearchRpository {
            B.name AS competition_name,
            B.kor_name AS kor_competition_name,
            B.logo AS competition_logo,
+           B.primary_color,
+           B.secondary_color,
            A.home_team_id,
            C.name AS home_team_name,
            C.kor_name AS kor_home_team_name,
@@ -150,11 +152,10 @@ export class SearchRpository {
     return result;
   }
 
-  async findCommunityPost(search : String, user_id : Number) {
+  async findCommunityPost(search : string, user_id : number) {
     // 메인 포스트 조회
     const selected_post = await this.db.query(`
       SELECT A.id
-           , B.id AS user_id
            , B.nick_name
            , B.img
            , I.img AS insignia_img
@@ -294,7 +295,7 @@ export class SearchRpository {
     return combined;
   }
 
-  async findAnalyzePost(search : String, user_id : Number) {
+  async findAnalyzePost(search : string, user_id : number) {
     // 메인 분석 포스트 조회
     const selected_post = await this.db.query(`
       SELECT A.id
@@ -494,7 +495,7 @@ export class SearchRpository {
     return combined;
   }
 
-  async findNews(search : String) {
+  async findNews(search : string) {
     const sql = `
     SELECT title,
            pub_date,
@@ -507,7 +508,7 @@ export class SearchRpository {
     return result;
   }
 
-  async findUser(search : String, user_id : Number) {
+  async findUser(search : string, user_id : number) {
     // 메인 사용자 조회
     const user_selected = await this.db.query(`
       SELECT A.id AS user_id
@@ -564,4 +565,587 @@ export class SearchRpository {
 
     return result;
   }
+
+  async findSportsDailyMatchInSportsTotal(search : string, user_id : number) {
+    try {
+      
+      const searchKeyword = `+${search}*`;
+      const sql = `
+      SELECT COUNT(A.id) AS count
+      FROM ts_daily_match A
+      JOIN ts_competition B ON A.competition_id = B.competition_id
+      JOIN ts_team C ON A.home_team_id = C.team_id
+      JOIN ts_team D ON A.away_team_id = D.team_id
+      JOIN ts_match_status E ON A.match_status = E.status_code AND A.category = E.category
+      LEFT JOIN user_bookmark AP ON A.id = AP.match_id AND AP.user_id = ?
+      WHERE A.is_deleted = 0
+      AND (
+        MATCH(B.name, B.kor_name) AGAINST(? IN BOOLEAN MODE)
+        OR MATCH(C.name, C.kor_name) AGAINST(? IN BOOLEAN MODE)
+        OR MATCH(D.name, D.kor_name) AGAINST(? IN BOOLEAN MODE)
+      )`;
+
+      const queryParams = [ user_id, searchKeyword, searchKeyword, searchKeyword ];
+
+      const result = await this.db.query(sql, queryParams);
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ findSportsDailyMatchInSports Error:', error);
+      throw error;
+    }
+  }
+
+  async findSportsDailyMatchInSports(search : string, user_id : number, page_no : number, limit : number) {
+    try {
+      // // 올바른 OFFSET 계산: (page_no - 1) * limit
+      const offset = (page_no - 1) * limit;
+      const searchKeyword = `+${search}*`;
+
+      const sql = `
+      SELECT STR_TO_DATE(CAST(A.matchtime AS CHAR), '%Y%m%d%H%i') AS timeinfo,
+             A.id AS match_id,
+             A.match_id AS sports_match_id,
+             A.category,
+             B.name AS competition_name,
+             B.kor_name AS kor_competition_name,
+             B.logo AS competition_logo,
+             B.primary_color,
+             B.secondary_color,
+             A.home_team_id,
+             C.name AS home_team_name,
+             C.kor_name AS kor_home_team_name,
+             C.logo AS home_team_logo,
+             A.away_team_id,
+             D.name AS away_team_name,
+             D.kor_name AS kor_away_team_name,
+             D.logo AS away_team_logo,
+             A.home_score,
+             A.away_score,
+             A.match_status,
+             E.status_description,
+             CASE WHEN AP.match_id IS NOT NULL THEN 1
+                 ELSE 0
+             END AS is_bookmark
+      FROM ts_daily_match A
+      JOIN ts_competition B ON A.competition_id = B.competition_id
+      JOIN ts_team C ON A.home_team_id = C.team_id
+      JOIN ts_team D ON A.away_team_id = D.team_id
+      JOIN ts_match_status E ON A.match_status = E.status_code AND A.category = E.category
+      LEFT JOIN user_bookmark AP ON A.id = AP.match_id AND AP.user_id = ?
+      -- WHERE (B.name LIKE ? OR B.kor_name LIKE ? OR C.name LIKE ? OR C.kor_name LIKE ? OR D.name LIKE ? OR D.kor_name LIKE ?)
+      WHERE A.is_deleted = 0
+      AND (
+        MATCH(B.name, B.kor_name) AGAINST(? IN BOOLEAN MODE)
+        OR MATCH(C.name, C.kor_name) AGAINST(? IN BOOLEAN MODE)
+        OR MATCH(D.name, D.kor_name) AGAINST(? IN BOOLEAN MODE)
+      )
+      ORDER BY
+      CASE WHEN AP.match_id IS NOT NULL THEN 0 ELSE 1 END,
+      CASE 
+          -- ⚽ 축구 진행중
+          WHEN A.category = 'soccer' AND A.match_status IN (2,3,4,5,6,7) THEN 1
+          -- 🏀 농구 진행중
+          WHEN A.category = 'basketball' AND A.match_status IN (2,3,4,5,6,7,8,9) THEN 1
+          -- 🏐 배구 진행중
+          WHEN A.category = 'volleyball' AND A.match_status IN (432,434,436,438,440) THEN 1
+          -- ⚾ 야구 진행중
+          WHEN A.category = 'baseball' AND A.match_status BETWEEN 432 AND 421 THEN 1
+          -- 🎮 LOL 진행중
+          WHEN A.category = 'lol' AND A.match_status = 2 THEN 1
+          -- 아직 시작 안한 경기
+          WHEN A.match_status = 1 THEN 2
+          -- 종료 / 취소 / 지연 등
+          WHEN A.match_status IN (8,9,10,11,12,13,14,15,100) THEN 3
+          ELSE 99
+      END,
+      -- 🔼 진행중 경기 안에서는 view_count 높은 순
+      CASE 
+          WHEN 
+          (A.category = 'soccer' AND A.match_status IN (2,3,4,5,6,7))
+          OR (A.category = 'basketball' AND A.match_status IN (2,3,4,5,6,7,8,9))
+          OR (A.category = 'volleyball' AND A.match_status IN (432,434,436,438,440))
+          OR (A.category = 'baseball' AND A.match_status BETWEEN 432 AND 421)
+          OR (A.category = 'lol' AND A.match_status = 2)
+          THEN A.view_count 
+          ELSE 0 
+      END DESC,
+      -- ⚽ 그 외 시간 순 정렬
+      A.matchtime ASC
+      LIMIT ${limit} OFFSET ${offset}`;
+
+      const queryParams = [ user_id, searchKeyword, searchKeyword, searchKeyword ];
+
+      const result = await this.db.query(sql, queryParams);
+
+      return result;
+      
+    } catch (error) {
+      console.error('❌ findSportsDailyMatchInSports Error:', error);
+      throw error;
+    }
+  }
+
+  async findCommunityPostInCom(search : string, user_id : number, page_no : number, limit : number, search_sub_type : string, filter : string) {
+    try {
+      const startTime = Date.now();
+      const offset = (page_no - 1) * limit;
+      
+      // 검색어 조건 설정
+      let whereConditions: string[] = [];
+      let queryParams = [user_id, user_id, search_sub_type];
+      
+      // 필터에 따른 검색 조건 구성
+      switch(filter) {
+        case 'all':
+          // 제목, 내용, 해시태그에서 검색
+          whereConditions.push(`(
+            A.title LIKE ? 
+            OR A.content LIKE ? 
+            OR EXISTS (
+              SELECT 1 FROM post_hashtag PH 
+              JOIN hashtag H ON PH.hashtag_id = H.id 
+              WHERE PH.post_id = A.id 
+              AND H.is_deleted = 0 
+              AND H.tag LIKE ?
+            )
+          )`);
+          queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+          break;
+        case 'title':
+          whereConditions.push('A.title LIKE ?');
+          queryParams.push(`%${search}%`);
+          break;
+        case 'content':
+          whereConditions.push('A.content LIKE ?');
+          queryParams.push(`%${search}%`);
+          break;
+        case 'tag':
+          whereConditions.push(`EXISTS (
+            SELECT 1 FROM post_hashtag PH 
+            JOIN hashtag H ON PH.hashtag_id = H.id 
+            WHERE PH.post_id = A.id 
+            AND H.is_deleted = 0 
+            AND H.tag LIKE ?
+          )`);
+          queryParams.push(`%${search}%`);
+          break;
+        case 'author':
+          whereConditions.push('U.nick_name LIKE ?');
+          queryParams.push(`%${search}%`);
+          break;
+        default:
+          // 기본값은 전체 검색
+          whereConditions.push(`(
+            A.title LIKE ? 
+            OR A.content LIKE ? 
+            OR EXISTS (
+              SELECT 1 FROM post_hashtag PH 
+              JOIN hashtag H ON PH.hashtag_id = H.id 
+              WHERE PH.post_id = A.id 
+              AND H.is_deleted = 0 
+              AND H.tag LIKE ?
+            )
+          )`);
+          queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+          break;
+      }
+
+      const whereClause = whereConditions.length > 0 ? `AND ${whereConditions.join(' AND ')}` : '';
+      
+      const sql = `
+      SELECT A.id
+           , A.title
+           , A.content
+           , U.nick_name
+           , A.created_at
+           , A.updated_at
+           , A.edited_at
+           , A.allowable_range
+           , A.views_count
+           , A.is_blind
+      FROM post A
+      JOIN user U ON A.user_id = U.id
+      LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = A.user_id
+      LEFT JOIN user_block UB2 ON UB2.user_id = A.user_id AND UB2.block_user_id = ?
+      WHERE A.type = ?
+      AND A.is_deleted = 0
+      AND A.is_blind = 0
+      AND U.is_deleted = 0
+      AND UB1.block_user_id IS NULL
+      AND UB2.block_user_id IS NULL
+      ${whereClause}
+      AND (
+          A.user_id = ${user_id}
+          OR A.allowable_range = 'public'
+          OR (
+              A.allowable_range = 'follower'
+              AND EXISTS (
+                  SELECT 1 FROM follow F
+                  WHERE F.user_id = ${user_id} AND F.following_id = A.user_id AND F.is_followed = 1
+              )
+          )
+      )
+      ORDER BY A.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}`;
+
+      const selected_post = await this.db.query(sql, queryParams);
+
+      if (selected_post.length === 0) {
+        const executionTime = Date.now() - startTime;
+        return [];
+      }
+
+      const post_ids = selected_post.map(p => p.id);
+      const placeholders = post_ids.map(() => '?').join(',');
+
+      // 좋아요 수 조회
+      // const selected_post_like = await this.db.query(`
+      //   SELECT L.post_id, COUNT(*) AS like_count
+      //   FROM post_like L
+      //   LEFT JOIN user_block UB ON UB.user_id = ? AND UB.block_user_id = L.user_id
+      //   LEFT JOIN user_block UB2 ON UB2.user_id = L.user_id AND UB2.block_user_id = ?
+      //   JOIN user U ON U.id = L.user_id AND U.is_deleted = 0
+      //   WHERE L.is_liked = 1
+      //   AND UB.block_user_id IS NULL
+      //   AND UB2.block_user_id IS NULL
+      //   AND L.post_id IN (${placeholders})
+      //   GROUP BY L.post_id
+      // `, [user_id, user_id, ...post_ids]);
+
+      // 댓글 수 조회
+      const selected_comment_count = await this.db.query(`
+        SELECT C.post_id, COUNT(*) AS comment_count
+        FROM post_comment C
+        LEFT JOIN user_block UB ON UB.user_id = ? AND UB.block_user_id = C.user_id
+        LEFT JOIN user_block UB2 ON UB2.user_id = C.user_id AND UB2.block_user_id = ?
+        JOIN user U ON U.id = C.user_id AND U.is_deleted = 0
+        WHERE C.is_deleted = 0
+        AND C.parent_comment_id IS NULL
+        AND (C.user_id = ? OR (C.user_id != ? AND C.is_blind = 0))
+        AND UB.block_user_id IS NULL
+        AND UB2.block_user_id IS NULL
+        AND C.post_id IN (${placeholders})
+        GROUP BY C.post_id
+      `, [user_id, user_id, user_id, user_id, ...post_ids]);
+
+      // 해시태그 조회
+      const selected_hashtag = await this.db.query(`
+        SELECT PH.post_id, GROUP_CONCAT(DISTINCT H.tag SEPARATOR ',') AS hash_tag
+        FROM post_hashtag PH
+        JOIN hashtag H ON PH.hashtag_id = H.id
+        WHERE H.is_deleted = 0
+        AND PH.post_id IN (${placeholders})
+        GROUP BY PH.post_id
+      `, [...post_ids]);
+
+      // 사용자 좋아요 여부 조회
+      // const selected_likes = await this.db.query(`
+      //   SELECT post_id, is_liked
+      //   FROM post_like
+      //   WHERE user_id = ?
+      //   AND post_id IN (${placeholders})
+      // `, [user_id, ...post_ids]);
+
+
+
+      // analyze 타입일 때 스포츠 매치 정보 조회
+      let selected_sports: any[] = [];
+      let sportsMap = new Map();
+      
+      if (search_sub_type === 'analyze') {
+        selected_sports = await this.db.query(`
+          SELECT A.id AS post_id
+               , B.match_id AS sports_match_id
+               , B.competition_id
+               , C.name AS competition_name
+               , C.kor_name AS kor_competition_name
+               , C.logo AS competition_logo
+               , STR_TO_DATE(CAST(B.matchtime AS CHAR), '%Y%m%d%H%i') AS timeinfo
+               , D.name AS home_team_name
+               , D.kor_name AS kor_home_team_name
+               , D.logo AS home_team_logo
+               , E.name AS away_team_name
+               , E.kor_name AS kor_away_team_name
+               , E.logo AS away_team_logo
+               -- , B.home_score
+               -- , B.away_score
+               , B.match_status
+               , F.status_description
+               , B.category
+               , AP.winner_id
+               , CASE WHEN AP.winner_id = D.team_id THEN D.name
+                      WHEN AP.winner_id = E.team_id THEN E.name
+                      ELSE NULL END AS winner_name
+               , CASE WHEN AP.winner_id = D.team_id THEN D.kor_name
+                      WHEN AP.winner_id = E.team_id THEN E.kor_name
+                      ELSE NULL END AS winner_kor_name
+          FROM post A
+          JOIN ts_daily_match B ON A.match_id = B.id
+          JOIN ts_competition C ON B.competition_id = C.competition_id
+          JOIN ts_team D ON B.home_team_id = D.team_id
+          JOIN ts_team E ON B.away_team_id = E.team_id
+          JOIN ts_match_status F ON B.match_status = F.status_code AND B.category = F.category
+          LEFT JOIN analyze_pick AP ON A.id = AP.post_id
+          WHERE A.id IN (${placeholders})
+        `, [...post_ids]);
+
+        // 스포츠 Map 생성 (승자 정보 포함)
+        sportsMap = new Map(selected_sports.map(s => [s.post_id, {
+          sports_match_id: s.sports_match_id,
+          competition_id: s.competition_id,
+          competition_name: s.competition_name,
+          kor_competition_name: s.kor_competition_name,
+          competition_logo: s.competition_logo,
+          timeinfo: s.timeinfo,
+          home_team_name: s.home_team_name,
+          kor_home_team_name: s.kor_home_team_name,
+          home_team_logo: s.home_team_logo,
+          away_team_name: s.away_team_name,
+          kor_away_team_name: s.kor_away_team_name,
+          away_team_logo: s.away_team_logo,
+          // home_score: s.home_score,
+          // away_score: s.away_score,
+          match_status: s.match_status,
+          status_description: s.status_description,
+          category: s.category, // 스포츠 타입 추가
+          winner_id: s.winner_id,
+          winner_name: s.winner_name,
+          winner_kor_name: s.winner_kor_name
+        }]));
+
+        console.log(`🔍 sportsMap 생성 완료:`, sportsMap);
+      }
+
+      // 포스트 이미지 조회
+      const post_img = await this.db.query(`
+        SELECT A.id
+             , A.post_id
+             , A.img
+        FROM post_img A
+        WHERE A.post_id IN (${placeholders})
+        AND A.is_deleted = 0
+        ORDER BY A.post_id ASC
+        LIMIT 1
+      `, [...post_ids]);
+
+      // Map 구조로 변환
+      // const likeCountMap = new Map(selected_post_like.map(({post_id, like_count}) => [post_id, like_count]));
+      const commentCountMap = new Map(selected_comment_count.map(({post_id, comment_count}) => [post_id, comment_count]));
+      const hashTagMap = new Map(selected_hashtag.map(({post_id, hash_tag}) => [post_id, hash_tag]));
+      // const likeFlagMap = new Map(selected_likes.map(({post_id, is_liked}) => [post_id, is_liked]));
+      const postImgMap = post_img.reduce((acc, item) => {
+        if (!acc[item.post_id]) acc[item.post_id] = [];
+        acc[item.post_id].push({ id: item.id, url: item.img });
+        return acc;
+      }, {});
+
+      // 결과 조합
+      const combined = selected_post.map(post => ({
+        ...post,
+        // like_count: likeCountMap.get(post.id) || 0,
+        comment_count: commentCountMap.get(post.id) || 0,
+        hash_tag: hashTagMap.get(post.id) ? hashTagMap.get(post.id).split(',') : [],
+        // like_flag: likeFlagMap.get(post.id) || 0,
+        files: postImgMap[post.id] || [],
+        sports: search_sub_type === 'analyze' ? (sportsMap.get(post.id) || null) : undefined
+      }));
+  
+      return combined;      
+    } catch (error) {
+      console.error('❌ findCommunityPostInCom Error:', error);
+      throw error;
+    }
+  }
+
+  async findCommunityPostInComTotal(search : string, user_id : number, search_sub_type : string, filter : string) {
+    try {
+      
+      // 검색어 조건 설정
+      let whereConditions: string[] = [];
+      let queryParams = [user_id, user_id, search_sub_type];
+      
+      // 필터에 따른 검색 조건 구성
+      switch(filter) {
+        case 'all':
+          // 제목, 내용, 해시태그에서 검색
+          whereConditions.push(`(
+            A.title LIKE ? 
+            OR A.content LIKE ? 
+            OR EXISTS (
+              SELECT 1 FROM post_hashtag PH 
+              JOIN hashtag H ON PH.hashtag_id = H.id 
+              WHERE PH.post_id = A.id 
+              AND H.is_deleted = 0 
+              AND H.tag LIKE ?
+            )
+          )`);
+          queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+          break;
+        case 'title':
+          whereConditions.push('A.title LIKE ?');
+          queryParams.push(`%${search}%`);
+          break;
+        case 'content':
+          whereConditions.push('A.content LIKE ?');
+          queryParams.push(`%${search}%`);
+          break;
+        case 'tag':
+          whereConditions.push(`EXISTS (
+            SELECT 1 FROM post_hashtag PH 
+            JOIN hashtag H ON PH.hashtag_id = H.id 
+            WHERE PH.post_id = A.id 
+            AND H.is_deleted = 0 
+            AND H.tag LIKE ?
+          )`);
+          queryParams.push(`%${search}%`);
+          break;
+        case 'author':
+          whereConditions.push('U.nick_name LIKE ?');
+          queryParams.push(`%${search}%`);
+          break;
+        default:
+          // 기본값은 전체 검색
+          whereConditions.push(`(
+            A.title LIKE ? 
+            OR A.content LIKE ? 
+            OR EXISTS (
+              SELECT 1 FROM post_hashtag PH 
+              JOIN hashtag H ON PH.hashtag_id = H.id 
+              WHERE PH.post_id = A.id 
+              AND H.is_deleted = 0 
+              AND H.tag LIKE ?
+            )
+          )`);
+          queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+          break;
+      }
+
+      const whereClause = whereConditions.length > 0 ? `AND ${whereConditions.join(' AND ')}` : '';
+      
+      const sql = `
+      SELECT COUNT(A.id) AS count
+      FROM post A
+      JOIN user U ON A.user_id = U.id
+      LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = A.user_id
+      LEFT JOIN user_block UB2 ON UB2.user_id = A.user_id AND UB2.block_user_id = ?
+      WHERE A.type = ?
+      AND A.is_deleted = 0
+      AND A.is_blind = 0
+      AND U.is_deleted = 0
+      AND UB1.block_user_id IS NULL
+      AND UB2.block_user_id IS NULL
+      ${whereClause}
+      AND (
+          A.user_id = ${user_id}
+          OR A.allowable_range = 'public'
+          OR (
+              A.allowable_range = 'follower'
+              AND EXISTS (
+                  SELECT 1 FROM follow F
+                  WHERE F.user_id = ${user_id} AND F.following_id = A.user_id AND F.is_followed = 1
+              )
+          )
+      )`;
+
+      const result = await this.db.query(sql, queryParams);
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ findCommunityPostInComTotal Error:', error);
+      throw error;
+    }
+  }
+
+  async findNewsTabTotal(search : string) {
+
+    const searchKeyword = `+${search}*`;
+    const sql = `
+    SELECT COUNT(id) AS count
+    FROM news
+    WHERE MATCH(title, description) AGAINST(? IN BOOLEAN MODE)`;
+    
+    const result = await this.db.query(sql, [searchKeyword]);
+    return result;
+  }
+
+  async findNewsTab(search : string, page_no : number, limit : number) {
+
+    const searchKeyword = `+${search}*`;
+    const offset = (page_no - 1) * limit;
+    
+    const sql = `
+    SELECT title,
+           description,
+           thumnail,
+           originallink,
+           link,
+           pub_date
+    FROM news
+    WHERE MATCH(title, description) AGAINST(? IN BOOLEAN MODE)
+    ORDER BY pub_date DESC
+    LIMIT ${limit} OFFSET ${offset}`;
+    
+    const result = await this.db.query(sql, [searchKeyword]);
+    return result;
+  }
+
+  // async getSearchUser(search: string, user_id: number, page_no: number, limit : number) {
+  //   try {
+  //     const offset = (page_no - 1) * limit;
+
+  //     // 사용자 목록 페이지네이션 조회
+  //     const selected_users = await this.db.query(
+  //       `SELECT A.id AS user_id
+  //             , A.img
+  //             , I.img AS insignia_img
+  //             , A.nick_name
+  //        FROM user A
+  //        LEFT JOIN insignia I ON A.insignia_level = I.insignia_level
+  //        WHERE A.nick_name LIKE ?
+  //        AND A.is_deleted = 0
+  //        AND NOT EXISTS (
+  //           SELECT 1 
+  //           FROM user_block UB
+  //           WHERE UB.user_id = ?
+  //           AND UB.block_user_id = A.id
+  //        )
+  //        AND NOT EXISTS (
+  //           SELECT 1
+  //           FROM user_block UB2
+  //           WHERE UB2.user_id = A.id 
+  //           AND UB2.block_user_id = ?    
+  //        )
+  //        LIMIT ? OFFSET ?`, [ `%${search}%`, user_id, user_id, page_limit, offset ]);
+
+  //     if (selected_users.length === 0) {
+  //       return { total, page_count, search: [] };
+  //     }
+
+  //     const user_ids = selected_users.map(u => u.user_id);
+  //     const placeholders = user_ids.map(() => '?').join(',');
+
+  //     // 팔로우 상태 조회
+  //     const followRows = await this.db.query(
+  //       `SELECT following_id
+  //             , CASE WHEN is_followed = 1 THEN 1 ELSE 0 END AS is_followed
+  //        FROM follow
+  //        WHERE user_id = ?
+  //        AND following_id IN (${placeholders})`, [ user_id, ...user_ids ]);
+
+  //     const followMap = new Map(followRows.map(f => [String(f.following_id), f.is_followed]));
+
+  //     const users = selected_users.map(u => ({
+  //       ...u,
+  //       follows: followMap.get(String(u.user_id)) ?? 0
+  //     }));
+
+  //     return { total, page_count, search: users };
+  //   } catch (error) {
+  //     console.error('❌ getSearchUser Error:', error);
+  //     throw error;
+  //   }
+  // }
 }

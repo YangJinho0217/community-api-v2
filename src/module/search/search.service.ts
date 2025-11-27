@@ -97,43 +97,75 @@ export class SearchService {
     }
 
     async getSearchSports(getSearchDto : GetSearchDto, user? : any) {
+
         const user_id = user?.user_id || null;
         const search = getSearchDto.search;
+        const page_no = getSearchDto.page_no || 1;
+        const limit = getSearchDto.limit || 10;
 
-        const match = await this.searchRepository.findSportsDailyMatch(search, user_id);
+        //dailymatch
+        const totalMatch = await this.searchRepository.findSportsDailyMatchInSportsTotal(search, user_id);
+        const matches = await this.searchRepository.findSportsDailyMatchInSports(search, user_id, page_no, limit);
         
-        return { match };
+        const result = {
+            total_count : totalMatch[0].count,
+            total_page : Math.ceil(totalMatch[0].count / limit),
+            match : matches
+        }
+
+        return result;
+
     }
 
     async getSearchCommunity(getSearchDto : GetSearchDto, user? : any) {
         const user_id = user?.user_id || null;
         const search = getSearchDto.search;
-        const search_sub_type = getSearchDto.search_sub_type;
-        const filter = getSearchDto.filter;
+        const page_no = getSearchDto.page_no || 1;
+        const limit = getSearchDto.limit || 10;
+        const search_sub_type = getSearchDto.search_sub_type || '';
+        const filter = getSearchDto.filter || '';
 
-        const community = await this.searchRepository.findCommunityPost(search, user_id);
+        const totalCommunity = await this.searchRepository.findCommunityPostInComTotal(search, user_id, search_sub_type, filter);
+        const community = await this.searchRepository.findCommunityPostInCom(search, user_id, page_no, limit, search_sub_type, filter);
         
-        return { community };
+        const result = {
+            total_count : totalCommunity[0].count,
+            total_page : Math.ceil(totalCommunity[0].count / limit),
+            community : community
+        }
+
+        return result;
     }
 
     async getSearchNews(getSearchDto : GetSearchDto, user? : any) {
         const user_id = user?.user_id || null;
         const search = getSearchDto.search;
+        const page_no = getSearchDto.page_no || 1;
+        const limit = getSearchDto.limit || 10;
 
         // TODO: 뉴스 검색 로직 구현 예정
-        const news = [];
+        const totalNews = await this.searchRepository.findNewsTabTotal(search);
+        const news = await this.searchRepository.findNewsTab(search, page_no, limit);
         
-        return { news };
+        const result = {
+            total_count : totalNews[0].count,
+            total_page : Math.ceil(totalNews[0].count / limit),
+            news : news
+        }
+
+        return result;
     }
 
     async getSearchUser(getSearchDto : GetSearchDto, user? : any) {
         const user_id = user?.user_id || null;
         const search = getSearchDto.search;
+        const page_no = getSearchDto.page_no || 1;
+        const limit = getSearchDto.limit || 10;
 
         // TODO: 사용자 검색 로직 구현 예정
-        const users = [];
-        
-        return { users };
+        // const users = await this.searchRepository.getSearchUser(search, user_id, page_no, limit);
+        return null;
+        // return { users };
     }
 
 

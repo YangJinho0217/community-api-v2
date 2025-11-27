@@ -168,6 +168,8 @@ export class HomeRepository {
                 A.competition_id,
                 B.name AS competition_name,
                 B.kor_name AS kor_competition_name,
+                B.primary_color,
+                B.secondary_color,
                 B.logo AS competition_logo,
                 C.logo AS home_team_logo,
                 C.name AS home_team_name,
