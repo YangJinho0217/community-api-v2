@@ -105,16 +105,15 @@ export class SearchService {
 
         //dailymatch
         const totalMatch = await this.searchRepository.findSportsDailyMatchInSportsTotal(search, user_id);
-        // const matches = await this.searchRepository.findSportsDailyMatchInSports(search, user_id, page_no, limit);
-        console.log(totalMatch);
-        return;
-        // const result = {
-        //     total_count : totalMatch[0].count,
-        //     total_page : Math.ceil(totalMatch[0].count / limit),
-        //     match : matches
-        // }
+        const matches = await this.searchRepository.findSportsDailyMatchInSports(search, user_id, page_no, limit);
+        
+        const result = {
+            total_count : totalMatch[0].count,
+            total_page : Math.ceil(totalMatch[0].count / limit),
+            match : matches
+        }
 
-        // return result;
+        return result;
 
     }
 
@@ -164,9 +163,16 @@ export class SearchService {
         const limit = getSearchDto.limit || 10;
 
         // TODO: 사용자 검색 로직 구현 예정
-        // const users = await this.searchRepository.getSearchUser(search, user_id, page_no, limit);
-        return null;
-        // return { users };
+        const totalUser = await this.searchRepository.findSearchUserTotal(search, user_id);
+        const users = await this.searchRepository.findSearchUser(search, user_id, page_no, limit);
+        
+        const result = {
+            total_count : totalUser[0].count,
+            total_page : Math.ceil(totalUser[0].count / limit),
+            users : users
+        }
+
+        return result;
     }
 
 
