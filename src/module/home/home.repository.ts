@@ -553,6 +553,7 @@ export class HomeRepository {
 
     const sql = `
       SELECT TD.id AS match_id,
+             TD.category,
              TC.name AS competition_name,
              TC.kor_name AS kor_competition_name,
              TC.logo AS competition_logo,

@@ -232,17 +232,11 @@ export class HomeService {
             this.homeRepository.findSportsInfoByMatchIds(matchIds)
         ]);
 
-        // 포스트 이미지 맵 생성
-        // const postImgMap = postImg.reduce((acc, item) => {
-        //     if (!acc[item.post_id]) acc[item.post_id] = [];
-        //     acc[item.post_id].push({ id: item.id, url: item.img });
-        //     return acc;
-        // }, {});
-
         // 스포츠 정보 맵 생성 (match_id 기준)
         const sportsMap = new Map((selectedSports || []).map(s => [
             s.match_id, {
                 timeinfo: s.timeinfo,
+                category : s.category,
                 sports_match_id: s.match_id,
                 competition_name: s.competition_name,
                 kor_competition_name: s.kor_competition_name,

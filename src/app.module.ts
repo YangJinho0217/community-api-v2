@@ -5,18 +5,13 @@ import { ConfigModule } from '@nestjs/config';
 import { ActivityLogInterceptor } from './common/activity-log.interceptor';
 import { DatabaseModule } from './database/database.module';
 
-// import { DatabaseM}
-
-// Controller
-
-// Service
-
 // Module
 import { CommonModule } from './module/common/common.module';
 import { InitializeModule } from './module/initialize/initialize.module';
-import { HomeController } from './module/home/home.controller';
 import { HomeModule } from './module/home/home.module';
 import { SearchModule } from './module/search/search.module';
+import { SportsService } from './module/sports/sports.service';
+import { SportsModule } from './module/sports/sports.module';
 
 @Module({
   imports: [
@@ -28,7 +23,8 @@ import { SearchModule } from './module/search/search.module';
     CommonModule,
     InitializeModule,
     HomeModule,
-    SearchModule
+    SearchModule,
+    SportsModule
   ],
   controllers: [AppController],
   providers: [
