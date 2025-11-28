@@ -158,6 +158,12 @@ export class SearchRpository {
       SELECT A.id
            , B.nick_name
            , B.img
+           , CASE WHEN B.user_level = '04' THEN '레전드'
+                  WHEN B.user_level = '03' THEN '프로'
+                  WHEN B.user_level = '02' THEN '아마추어'
+                  WHEN B.user_level = '01' THEN '일반'
+                  ELSE NULL 
+            END AS user_level
            , I.img AS insignia_img
            , A.title
            , A.content
@@ -172,7 +178,7 @@ export class SearchRpository {
       LEFT JOIN insignia I ON B.insignia_level = I.insignia_level
       LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = A.user_id
       LEFT JOIN user_block UB2 ON UB2.user_id = A.user_id AND UB2.block_user_id = ?
-      WHERE A.is_deleted = 0
+      WHERE A.is_deleted = 0 
       AND A.type = 'post'
       AND A.match_id IS NULL
       AND B.is_deleted = 0
@@ -302,6 +308,12 @@ export class SearchRpository {
            , B.id AS user_id
            , B.nick_name
            , B.img
+           , CASE WHEN B.user_level = '04' THEN '레전드'
+                  WHEN B.user_level = '03' THEN '프로'
+                  WHEN B.user_level = '02' THEN '아마추어'
+                  WHEN B.user_level = '01' THEN '일반'
+                  ELSE NULL 
+            END AS user_level
            , I.img AS insignia_img
            , A.title
            , A.content
@@ -912,6 +924,12 @@ export class SearchRpository {
             , A.title
             , A.content
             , U.nick_name
+            , CASE WHEN U.user_level = '04' THEN '레전드'
+                   WHEN U.user_level = '03' THEN '프로'
+                   WHEN U.user_level = '02' THEN '아마추어'
+                   WHEN U.user_level = '01' THEN '일반'
+                   ELSE NULL 
+             END AS user_level
             , A.created_at
             , A.updated_at
             , A.edited_at

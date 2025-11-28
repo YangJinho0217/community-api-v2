@@ -460,6 +460,7 @@ export class HomeRepository {
              B.nick_name,
              B.img,
              B.type,
+             ISG.img AS insignia_img,
              C.level_name,
              A.title,
              A.content,
@@ -492,6 +493,7 @@ export class HomeRepository {
       JOIN ts_daily_match TD ON AP.match_id = TD.id
       JOIN ts_team TDH ON TD.home_team_id = TDH.team_id
       JOIN ts_team TDA ON TD.away_team_id = TDA.team_id
+      LEFT JOIN insignia ISG ON B.insignia_level = ISG.insignia_level
       LEFT JOIN user_block UB1 ON UB1.user_id = ? AND UB1.block_user_id = A.user_id
       LEFT JOIN user_block UB2 ON UB2.user_id = A.user_id AND UB2.block_user_id = ?
       WHERE A.is_deleted = 0
