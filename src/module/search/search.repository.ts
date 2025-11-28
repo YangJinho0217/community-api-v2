@@ -566,31 +566,72 @@ export class SearchRpository {
     return result;
   }
 
-  async findSportsDailyMatchInSportsTotal(search : string, user_id : number) {
-    try {
+  // async findSportsDailyMatchInSportsTotal(search : string, user_id : number) {
+  //   try {
       
-      const searchKeyword = `+${search}*`;
-      const sql = `
-      SELECT COUNT(A.id) AS count
-      FROM ts_daily_match A
-      JOIN ts_competition B ON A.competition_id = B.competition_id
-      JOIN ts_team C ON A.home_team_id = C.team_id
-      JOIN ts_team D ON A.away_team_id = D.team_id
-      JOIN ts_match_status E ON A.match_status = E.status_code AND A.category = E.category
-      LEFT JOIN user_bookmark AP ON A.id = AP.match_id AND AP.user_id = ?
-      WHERE A.is_deleted = 0
-      AND (
-        MATCH(B.name, B.kor_name) AGAINST(? IN BOOLEAN MODE)
-        OR MATCH(C.name, C.kor_name) AGAINST(? IN BOOLEAN MODE)
-        OR MATCH(D.name, D.kor_name) AGAINST(? IN BOOLEAN MODE)
-      )`;
+  //     const searchKeyword = `+${search}*`;
+  //     const sql = `
+  //     SELECT COUNT(A.id) AS count
+  //     FROM ts_daily_match A
+  //     JOIN ts_competition B ON A.competition_id = B.competition_id
+  //     JOIN ts_team C ON A.home_team_id = C.team_id
+  //     JOIN ts_team D ON A.away_team_id = D.team_id
+  //     JOIN ts_match_status E ON A.match_status = E.status_code AND A.category = E.category
+  //     LEFT JOIN user_bookmark AP ON A.id = AP.match_id AND AP.user_id = ?
+  //     WHERE A.is_deleted = 0
+  //     AND (
+  //       MATCH(B.name, B.kor_name) AGAINST(? IN BOOLEAN MODE)
+  //       OR MATCH(C.name, C.kor_name) AGAINST(? IN BOOLEAN MODE)
+  //       OR MATCH(D.name, D.kor_name) AGAINST(? IN BOOLEAN MODE)
+  //     )`;
 
-      const queryParams = [ user_id, searchKeyword, searchKeyword, searchKeyword ];
+  //     const queryParams = [ user_id, searchKeyword, searchKeyword, searchKeyword ];
+
+  //     const result = await this.db.query(sql, queryParams);
+      
+  //     return result;
+      
+  //   } catch (error) {
+  //     console.error('❌ findSportsDailyMatchInSports Error:', error);
+  //     throw error;
+  //   }
+  // }
+
+  async findSportsDailyMatchInSportsTotal(search: string, user_id: number) {
+    try {
+      const searchKeyword = `+${search}*`;
+
+      const sql = `
+        SELECT COUNT(*) AS count
+        FROM ts_daily_match A
+        JOIN ts_match_status E 
+          ON A.match_status = E.status_code AND A.category = E.category
+        LEFT JOIN user_bookmark AP 
+          ON A.id = AP.match_id AND AP.user_id = ?
+        JOIN (
+            SELECT competition_id AS cid, NULL AS tid
+            FROM ts_competition
+            WHERE MATCH(name, kor_name) AGAINST(? IN BOOLEAN MODE)
+
+            UNION
+
+            SELECT NULL AS cid, team_id AS tid
+            FROM ts_team
+            WHERE MATCH(name, kor_name) AGAINST(? IN BOOLEAN MODE)
+        ) X ON (
+            A.competition_id = X.cid 
+            OR A.home_team_id = X.tid 
+            OR A.away_team_id = X.tid
+        )
+        WHERE A.is_deleted = 0;
+      `;
+
+      const queryParams = [ user_id, searchKeyword, searchKeyword ];
 
       const result = await this.db.query(sql, queryParams);
-      
+
       return result;
-      
+
     } catch (error) {
       console.error('❌ findSportsDailyMatchInSports Error:', error);
       throw error;
