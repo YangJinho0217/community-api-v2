@@ -389,5 +389,34 @@ export class CommonRepository {
     WHERE uuid = ?`;
     await this.db.query(sql, [password, password_salt, uuid]);
   }
+
+  async deleteUserSessionByAccessToken(accessToken: string) {
+    const sql = `
+    DELETE FROM user_session
+    WHERE session = ?`;
+    await this.db.query(sql, [accessToken]);
+  }
+
+  async deleteUserSessionByRefreshToken(refreshToken: string) {
+    const sql = `
+    DELETE FROM user_session
+    WHERE refresh_session = ?`;
+    await this.db.query(sql, [refreshToken]);
+  }
+
+  async deleteUserSessionByUserId(user_id: number) {
+    const sql = `
+    DELETE FROM user_session
+    WHERE user_id = ?`;
+    await this.db.query(sql, [user_id]);
+  }
+
+  async clearFcmTokenByUserId(user_id: number) {
+    const sql = `
+    UPDATE user_session
+    SET fcm_token = NULL
+    WHERE user_id = ?`;
+    await this.db.query(sql, [user_id]);
+  }
   
 }

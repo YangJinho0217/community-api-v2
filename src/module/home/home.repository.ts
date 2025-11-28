@@ -90,6 +90,7 @@ export class HomeRepository {
         AND A.type = 'analyze'
         AND A.match_id IS NOT NULL
         AND B.is_deleted = 0
+        AND B.user_level != '02'
         AND UB1.block_user_id IS NULL
         AND UB2.block_user_id IS NULL
         AND TD.matchtime BETWEEN ? AND ?
@@ -168,8 +169,9 @@ export class HomeRepository {
                 A.competition_id,
                 B.name AS competition_name,
                 B.kor_name AS kor_competition_name,
-                B.primary_color,
-                B.secondary_color,
+                -- B.primary_color,
+                CASE WHEN B.is_popular = 1 THEN B.primary_color ELSE '' END AS primary_color,
+                -- B.secondary_color,
                 B.logo AS competition_logo,
                 C.logo AS home_team_logo,
                 C.name AS home_team_name,

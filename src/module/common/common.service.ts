@@ -19,6 +19,7 @@ import { RefreshTokenDto } from './dto/refreshToken.dto';
 import { GetUserUuidDto } from './dto/getUserUuid.dto';
 import { GetUserPasswordDto } from './dto/getUserPassword.dto';
 import { UpdateUserPasswordDto } from './dto/updateUserPassword.dto';
+import { LogOutDto } from './dto/logOut.dto';
 
 @Injectable()
 export class CommonService {
@@ -620,6 +621,19 @@ export class CommonService {
 
     return 200;
 
+  }
+
+  async logout(logOutDto : LogOutDto, user?: any, response?: Response) {
+    // user는 OptionalJwtAuthGuard로부터 올 수 있음. 없을 경우에도 안전하게 동작
+    const deviceType = logOutDto.device_type;
+
+    // PC면 쿠키 삭제
+    if (deviceType === 'pc' && response) {
+      response.clearCookie('access_token');
+      response.clearCookie('refresh_token');
+    }
+
+    return 200;
   }
 
 }
