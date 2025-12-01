@@ -147,10 +147,15 @@ export class SportsService {
             sportsInfo = await this.getSportsInfo(sports_match_id, category, season_id, home_team_id, away_team_id, sportsHeader[0]);
         }
 
+        let sportsLineup : any = '';
+        if(type === 'lineup') {
+            sportsLineup = await this.getSportsLineup(category, sports_match_id, season_id, home_team_id, away_team_id);
+        }
         const result = {
             header : sportsHeader,
             widget : sportsWidget,
-            info : sportsInfo
+            info : sportsInfo,
+            lineup : sportsLineup
         }
         return result;
     }
@@ -737,5 +742,129 @@ export class SportsService {
         }
         return data;
     }
-    
+
+    async getSportsLineup(category: string, match_id: string, competition_id: string, home_team_id: string, away_team_id: string) {
+        const data: any = {};
+        if(!(home_team_id && away_team_id)) return data;
+
+        let url = '';
+        switch(category) {
+            case 'soccer': url = this.configService.get<string>('THE_SPORTS_SOCCER_URL')!; break;
+            case 'basketball': url = this.configService.get<string>('THE_SPORTS_BASKETBALL_URL')!; break;
+            case 'baseball': url = this.configService.get<string>('THE_SPORTS_BASEBALL_URL')!; break;
+            case 'lol': url = this.configService.get<string>('THE_SPORTS_LOL_URL')!; break;
+            case 'volleyball': url = this.configService.get<string>('THE_SPORTS_VOLLEYBALL_URL')!; break;
+            default: return data;
+        }
+
+        const apiUser = this.configService.get<string>('THE_SPORTS_API_USER')!;
+        const apiKey = this.configService.get<string>('THE_SPORTS_API_SECRET_KEY')!;
+
+        // 공통 팀명
+        data.home_team_name = data.home_team_name || null;
+        data.away_team_name = data.away_team_name || null;
+
+        try {
+            if(category === 'soccer') {
+                
+                const resp = await axios.get(`${url}/match/lineup/detail`, {
+                    headers: { 'Accept': 'application/json' },
+                    params: { user: apiUser, secret: apiKey, uuid: match_id }
+                });
+
+                const lineupData = resp.data?.results;
+                data.home_team_formation = lineupData?.home_formation || null;
+                data.away_team_formation = lineupData?.away_formation || null;
+                data.home_team_lineup = Array.isArray(lineupData?.lineup?.home) ? lineupData.lineup.home.map((p: any) => ({
+                    id: p.id || null,
+                    first: p.first || null,
+                    captain: p.captain || null,
+                    name: p.name || null,
+                    logo: p.logo || null,
+                    shirt_number: Number(p.shirt_number) || 0,
+                    position: p.position || null,
+                    x: p.x || null,
+                    y: p.y || null
+                })) : [];
+
+                data.away_team_lineup = Array.isArray(lineupData?.lineup?.away) ? lineupData.lineup.away.map((p: any) => ({
+                    id: p.id || null,
+                    first: p.first || null,
+                    captain: p.captain || null,
+                    name: p.name || null,
+                    logo: p.logo || null,
+                    shirt_number: Number(p.shirt_number) || 0,
+                    position: p.position || null,
+                    x: p.x || null,
+                    y: p.y || null
+                })) : [];
+
+                data.home_team_injury = Array.isArray(lineupData?.injury?.home) ? lineupData.injury.home.map((p: any) => ({
+                    id: p.id || null,
+                    name: p.name || null,
+                    position: p.position || null,
+                    logo: p.logo || null,
+                    injury_id: p.injury_id || null,
+                    reason: p.reason || null
+                })) : [];
+
+                data.away_team_injury = Array.isArray(lineupData?.injury?.away) ? lineupData.injury.away.map((p: any) => ({
+                    id: p.id || null,
+                    name: p.name || null,
+                    position: p.position || null,
+                    logo: p.logo || null,
+                    injury_id: p.injury_id || null,
+                    reason: p.reason || null
+                })) : [];
+
+            } else if (category === 'basketball') {
+                // 라인업
+                const homeSquad = await axios.get(`${url}/team/squad/list`, { headers: { 'Accept': 'application/json' }, params: { user: apiUser, secret: apiKey, uuid: home_team_id }});
+                const awaySquad = await axios.get(`${url}/team/squad/list`, { headers: { 'Accept': 'application/json' }, params: { user: apiUser, secret: apiKey, uuid: away_team_id }});
+                data.home_team_lineup = homeSquad.data?.results?.[0]?.squad?.map((p: any) => ({
+                    player_id: p.player?.id || null,
+                    name: p.player?.name || null,
+                    position: p.position || null,
+                    shirt_number: Number(p.shirt_number) || 0
+                })) || [];
+                data.away_team_lineup = awaySquad.data?.results?.[0]?.squad?.map((p: any) => ({
+                    player_id: p.player?.id || null,
+                    name: p.player?.name || null,
+                    position: p.position || null,
+                    shirt_number: Number(p.shirt_number) || 0
+                })) || [];
+                // 부상
+                const homeInjury = await axios.get(`${url}/team/injury/list`, { headers: { 'Accept': 'application/json' }, params: { user: apiUser, secret: apiKey, uuid: home_team_id }});
+                const awayInjury = await axios.get(`${url}/team/injury/list`, { headers: { 'Accept': 'application/json' }, params: { user: apiUser, secret: apiKey, uuid: away_team_id }});
+                data.home_team_injury = homeInjury.data?.results?.[0]?.injury?.map((p: any) => ({ player_id: p.player_id || null, reason: p.reason || null })) || [];
+                data.away_team_injury = awayInjury.data?.results?.[0]?.injury?.map((p: any) => ({ player_id: p.player_id || null, reason: p.reason || null })) || [];
+            } else if (category === 'baseball') {
+                const homeSquad = await axios.get(`${url}/team/squad/list`, { headers: { 'Accept': 'application/json' }, params: { user: apiUser, secret: apiKey, uuid: home_team_id }});
+                data.home_team_lineup = homeSquad.data?.results?.[0]?.squad?.map((p: any) => ({
+                    player_id: p.player_id || null,
+                    position: p.position || null,
+                    shirt_number: Number(p.shirt_number) || 0
+                })) || [];
+                const awaySquad = await axios.get(`${url}/team/squad/list`, { headers: { 'Accept': 'application/json' }, params: { user: apiUser, secret: apiKey, uuid: away_team_id }});
+                data.away_team_lineup = awaySquad.data?.results?.[0]?.squad?.map((p: any) => ({
+                    player_id: p.player_id || null,
+                    position: p.position || null,
+                    shirt_number: Number(p.shirt_number) || 0
+                })) || [];
+                // 부상
+                const homeInjury = await axios.get(`${url}/team/injury/list`, { headers: { 'Accept': 'application/json' }, params: { user: apiUser, secret: apiKey, uuid: home_team_id }});
+                data.home_team_injury = homeInjury.data?.results?.[0]?.injury?.map((p: any) => ({ player_id: p.player_id || null, reason: p.reason || null })) || [];
+                const awayInjury = await axios.get(`${url}/team/injury/list`, { headers: { 'Accept': 'application/json' }, params: { user: apiUser, secret: apiKey, uuid: away_team_id }});
+                data.away_team_injury = awayInjury.data?.results?.[0]?.injury?.map((p: any) => ({ player_id: p.player_id || null, reason: p.reason || null })) || [];
+            } else if (category === 'lol') {
+                const homeLineup = await this.sportsRepository.findLolTeamLineup(home_team_id);
+                const awayLineup = await this.sportsRepository.findLolTeamLineup(away_team_id);
+                data.home_team_lineup = homeLineup;
+                data.away_team_lineup = awayLineup;
+            }
+        } catch(e) {
+            // 실패 시 부분 데이터만 반환
+        }
+        return data;
+    }
 }

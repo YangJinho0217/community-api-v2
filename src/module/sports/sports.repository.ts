@@ -173,4 +173,24 @@ export class SportsRepository {
       ORDER BY FIELD(team_id, ?, ?)`; // 홈/어웨이 순서 유지
     return this.db.query(sql, [homeTeamId, awayTeamId, competitionId, homeTeamId, awayTeamId]);
   }
+
+  async findLolTeamLineup(teamId: string | number) {
+    const sql = `
+      SELECT logo,
+             name,
+             CASE WHEN position = 1 THEN '원딜'
+                  WHEN position = 2 THEN '미드'
+                  WHEN position = 3 THEN '탑'
+                  WHEN position = 4 THEN '정글'
+                  WHEN position = 5 THEN '서포터'
+                  ELSE NULL END AS position_name,
+             CASE WHEN is_first = 1 THEN 'Starting'
+                  WHEN is_first = 2 THEN 'SubStitute'
+                  ELSE NULL END AS first,
+             real_name
+      FROM ts_lol_player
+      WHERE team_id = ?
+        AND is_first IN (1,2)`;
+    return this.db.query(sql, [teamId]);
+  }
 }
