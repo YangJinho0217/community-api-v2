@@ -392,6 +392,18 @@ export class SearchRpository {
            , CASE WHEN AP.match_id IS NOT NULL THEN 1
                   ELSE 0
              END AS is_bookmark
+           , AC.winner_id
+           , CASE WHEN AC.winner_id = D.team_id THEN D.name
+                   WHEN AC.winner_id = E.team_id THEN E.name
+                   ELSE NULL END AS winner_name
+           , CASE WHEN AC.winner_id = D.team_id THEN D.kor_name
+                   WHEN AC.winner_id = E.team_id THEN E.kor_name
+                   ELSE NULL END AS winner_kor_name
+           , CASE WHEN B.match_status = 1 THEN 'wait'
+                  WHEN B.winner = 'home' AND AC.winner_id = D.team_id THEN 'hit'
+                  WHEN B.winner = 'away' AND AC.winner_id = E.team_id THEN 'hit'
+                  WHEN B.winner = 'draw' AND AC.winner_id = 'draw' THEN 'hit'
+                  ELSE 'missed' END AS hit_flag
       FROM post A
       JOIN ts_daily_match B ON A.match_id = B.id
       JOIN ts_competition C ON B.competition_id = C.competition_id
@@ -399,6 +411,7 @@ export class SearchRpository {
       JOIN ts_team E ON B.away_team_id = E.team_id
       JOIN ts_match_status F ON B.match_status = F.status_code AND B.category = F.category
       LEFT JOIN user_bookmark AP ON A.id = AP.match_id AND AP.user_id = ?
+      LEFT JOIN analyze_pick AC ON A.id = AC.post_id
       WHERE A.id IN (${placeholders})
     `, [user_id, ...post_ids]);
 
@@ -490,7 +503,11 @@ export class SearchRpository {
       away_score: s.away_score,
       match_status: s.match_status,
       status_description: s.status_description,
-      is_bookmark: s.is_bookmark
+      is_bookmark: s.is_bookmark,
+      winner_id : s.winner_id,
+      winner_name : s.winner_name,
+      winner_kor_name : s.winner_kor_name,
+      hit_flag : s.hit_flag
     }]));
 
     // 조합
@@ -999,28 +1016,35 @@ export class SearchRpository {
       if (search_sub_type === 'analyze') {
         selected_sports = await this.db.query(`
           SELECT A.id AS post_id
-              , B.match_id AS sports_match_id
-              , B.competition_id
-              , C.name AS competition_name
-              , C.kor_name AS kor_competition_name
-              , C.logo AS competition_logo
-              , STR_TO_DATE(CAST(B.matchtime AS CHAR), '%Y%m%d%H%i') AS timeinfo
-              , D.name AS home_team_name
-              , D.kor_name AS kor_home_team_name
-              , D.logo AS home_team_logo
-              , E.name AS away_team_name
-              , E.kor_name AS kor_away_team_name
-              , E.logo AS away_team_logo
-              , B.match_status
-              , F.status_description
-              , B.category
-              , AP.winner_id
-              , CASE WHEN AP.winner_id = D.team_id THEN D.name
-                      WHEN AP.winner_id = E.team_id THEN E.name
-                      ELSE NULL END AS winner_name
-              , CASE WHEN AP.winner_id = D.team_id THEN D.kor_name
-                      WHEN AP.winner_id = E.team_id THEN E.kor_name
-                      ELSE NULL END AS winner_kor_name
+               , B.match_id AS sports_match_id
+               , B.competition_id
+               , C.name AS competition_name
+               , C.kor_name AS kor_competition_name
+               , C.logo AS competition_logo
+               , STR_TO_DATE(CAST(B.matchtime AS CHAR), '%Y%m%d%H%i') AS timeinfo
+               , D.name AS home_team_name
+               , D.kor_name AS kor_home_team_name
+               , D.logo AS home_team_logo
+               , E.name AS away_team_name
+               , E.kor_name AS kor_away_team_name
+               , E.logo AS away_team_logo
+               , B.match_status
+               , F.status_description
+               , B.category
+               , B.home_score
+               , B.away_score
+               , AP.winner_id
+               , CASE WHEN AP.winner_id = D.team_id THEN D.name
+                       WHEN AP.winner_id = E.team_id THEN E.name
+                       ELSE NULL END AS winner_name
+               , CASE WHEN AP.winner_id = D.team_id THEN D.kor_name
+                       WHEN AP.winner_id = E.team_id THEN E.kor_name
+                       ELSE NULL END AS winner_kor_name
+               , CASE WHEN B.match_status = 1 THEN 'wait'
+                      WHEN B.winner = 'home' AND AP.winner_id = D.team_id THEN 'hit'
+                      WHEN B.winner = 'away' AND AP.winner_id = E.team_id THEN 'hit'
+                      WHEN B.winner = 'draw' AND AP.winner_id = 'draw' THEN 'hit'
+                      ELSE 'missed' END AS hit_flag
           FROM post A
           JOIN ts_daily_match B ON A.match_id = B.id
           JOIN ts_competition C ON B.competition_id = C.competition_id
