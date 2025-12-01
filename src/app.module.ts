@@ -12,6 +12,9 @@ import { HomeModule } from './module/home/home.module';
 import { SearchModule } from './module/search/search.module';
 import { SportsService } from './module/sports/sports.service';
 import { SportsModule } from './module/sports/sports.module';
+import { AnalyzeController } from './module/analyze/analyze.controller';
+import { AnalyzeService } from './module/analyze/analyze.service';
+import { AnalyzeModule } from './module/analyze/analyze.module';
 
 @Module({
   imports: [
@@ -24,7 +27,8 @@ import { SportsModule } from './module/sports/sports.module';
     InitializeModule,
     HomeModule,
     SearchModule,
-    SportsModule
+    SportsModule,
+    AnalyzeModule
   ],
   controllers: [AppController],
   providers: [
