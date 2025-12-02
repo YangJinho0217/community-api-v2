@@ -602,5 +602,67 @@ export class AnalyzeRepository {
 
   }
 
+  async findUserLevel(user_id : number) {
+
+    const sql = `
+    SELECT user_level
+    FROM user
+    WHERE id = ?`;
+    const result = await this.db.query(sql, [user_id]);
+    return result[0];    
+
+  }
+
+  async findCategoryInGenerateAnalyzePost() {
+
+    const sql = `
+    SELECT category_key,
+           category_name
+    FROM category
+    WHERE id != 1
+    ORDER BY id ASC`;
+    const result = await this.db.query(sql, []);
+    return result;
+
+  }
+
+  async findCompetitionInGenerateAnalyzePost(categoryCondition : string, categoryParams: any[], dateCondition : string, dateParams : any[]) {
+
+    const sql = `
+    SELECT A.competition_id,
+           MAX(B.name) AS name,
+           MAX(B.kor_name) AS kor_name
+    FROM ts_daily_match A
+    JOIN ts_competition B ON A.competition_id = B.competition_id
+    ${categoryCondition}
+    ${dateCondition}
+    AND A.match_status = 1
+    GROUP BY A.competition_id`;
+    const result = await this.db.query(sql, [...categoryParams, ...dateParams]);
+    return result;
+  }
+
+  async findMatchInGenerateAnalyzePost(categoryCondition : string, categoryParams: any[], dateCondition : string, dateParams : any[], competition_id : string) {
+
+    const sql = `
+    SELECT A.match_id AS sports_match_id,
+           STR_TO_DATE(CAST(A.matchtime AS CHAR), '%Y%m%d%H%i') AS matchtime,
+           A.home_team_id,
+           A.away_team_id,
+           C.kor_name AS kor_home_team_name,
+           D.kor_name AS kor_away_team_name
+    FROM ts_daily_match A
+    JOIN ts_competition B ON A.competition_id = B.competition_id
+    JOIN ts_team C ON A.home_team_id = C.team_id
+    JOIN ts_team D On A.away_team_id = D.team_id
+    ${categoryCondition}
+    ${dateCondition}
+    AND A.match_status = 1
+    AND A.competition_id = ?
+    ORDER BY A.matchtime ASC`;
+    const result = await this.db.query(sql, [...categoryParams, ...dateParams, competition_id]);
+    return result;
+  }
+
   
 }

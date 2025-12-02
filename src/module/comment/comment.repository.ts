@@ -1,5 +1,5 @@
 // src/modules/user/user.repository.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { PoolConnection } from 'mysql2/promise';
 
@@ -168,6 +168,67 @@ export class CommentRepository {
       return combined;
 
     } 
+
+  }
+
+  async generateComment(post_id : number, user_id : number, content : string) {
+
+    const post_sql = `
+    SELECT COUNT(id) AS count
+    FROM post
+    WHERE id = ?`;
+    const result = await this.db.query(post_sql, [post_id]);
+
+    if(result[0].count > 0) {
+        const sql = `
+        INSERT INTO post_comment(post_id, user_id, content)
+        VALUES(?,?,?)`;
+        await this.db.query(sql, [post_id, user_id, content]);
+        return 200;
+    } else {
+        return 404;
+    }
+
+  }
+
+  async generateReply(post_id : number, comment_id : number, user_id : number, content : string) {
+
+    const post_sql = `
+    SELECT COUNT(id) AS count
+    FROM post
+    WHERE id = ?`;
+    const result = await this.db.query(post_sql, [post_id]);
+
+    if(result[0].count > 0) {
+
+        const comment_sql = `
+        SELECT COUNT(id) AS count
+        FROM post_comment
+        WHERE id = ?
+        AND post_id = ?`;
+        const result = await this.db.query(comment_sql, [comment_id, post_id]);
+        
+        if(result[0].count > 0) {
+            const sql = `
+            INSERT INTO post_comment(post_id, parent_comment_id, user_id, content)
+            VALUES(?,?,?,?)`;
+            await this.db.query(sql, [post_id, comment_id, user_id, content]);
+            return 200;
+        } else {
+            const exception = {
+                success : false,
+                type : 'comment'
+            }
+            return exception;
+        }
+        
+    } else {
+        const exception = {
+            success : false,
+            type : 'post'
+        }
+        return exception;
+    }
 
   }
   

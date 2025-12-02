@@ -1,7 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { AnalyzeRepository } from './analyze.repository';
 import { GetAnalyzeDto } from './dto/getAnalyze.dto';
 import { GetAnalyzeDetailDto } from './dto/getAnalyzeDetail.dto';
+import { GetCompetitionInGenerateAnalyzePostDto } from './dto/getCompetitionInAnalyzePost.dto';
+import { toDateRangeFromYMD } from 'src/common/date.util';
+import { GetMatchInGenerateAnalyzePostDto } from './dto/getMatchInAnalyzePost.dto';
+import { GenerateAnalyzePostDto } from './dto/generateAnalyePost.dto';
 
 @Injectable()
 export class AnalyzeService {
@@ -61,5 +65,103 @@ export class AnalyzeService {
             ...post,
             comment_list
         };
+    }
+
+    async getCategoryInGenerateAnalyzePost(user? : any) {
+
+        const user_id = user?.user_id || null;
+        const findUserLevel = await this.analyzeRepository.findUserLevel(user_id);
+        const user_level = Number(findUserLevel.user_level);
+
+        if(user_level < 3) {
+            throw new ForbiddenException('access_permission_denied');
+        }
+
+        const findCategoryInGenerateAnalyzePost = await this.analyzeRepository.findCategoryInGenerateAnalyzePost();
+
+        return findCategoryInGenerateAnalyzePost;
+        
+    }
+
+    async getCompetitionInGenerateAnalyzePost(getCompetitionInGenerateAnalyzePostDto : GetCompetitionInGenerateAnalyzePostDto, user? : any) {
+
+        const user_id = user?.user_id || null;
+        const category = getCompetitionInGenerateAnalyzePostDto.category || '';
+        const date = getCompetitionInGenerateAnalyzePostDto.date || '';
+
+        const findUserLevel = await this.analyzeRepository.findUserLevel(user_id);
+        const user_level = Number(findUserLevel.user_level);
+
+        if(user_level < 3) {
+            throw new ForbiddenException('access_permission_denied');
+        }
+
+        // 날짜 변환: 'YYYY-MM-DD' -> 'YYYYMMDD0000' / 'YYYYMMDD2359'
+        const range = toDateRangeFromYMD(date);
+        const queryStartDate = range?.start || '';
+        const queryEndDate = range?.end || '';
+
+        let dateCondition = '';
+        let dateParams : string[] = [];
+        if(queryStartDate && queryEndDate) {
+            dateCondition = 'AND A.matchtime >= ? AND A.matchtime <= ?';
+            dateParams = [queryStartDate, queryEndDate];
+        }
+
+        let categoryCondition = '';
+        let categoryParams : string[] = [];
+
+        if(category) {
+            categoryCondition = 'WHERE A.category = ?';
+            categoryParams = [category];
+        }
+
+        // TODO: repository 호출 시 queryStartDate, queryEndDate 사용
+        const result = await this.analyzeRepository.findCompetitionInGenerateAnalyzePost(categoryCondition, categoryParams, dateCondition, dateParams);
+        return result;
+    }
+
+    async getMatchInGenerateAnalyzePost(getMatchInGenerateAnalyzePostDto : GetMatchInGenerateAnalyzePostDto, user? : any) {
+
+        const user_id = user?.user_id || null;
+        const category = getMatchInGenerateAnalyzePostDto.category || '';
+        const date = getMatchInGenerateAnalyzePostDto.date || '';
+        const competition_id = getMatchInGenerateAnalyzePostDto.competition_id || '';
+
+        const findUserLevel = await this.analyzeRepository.findUserLevel(user_id);
+        const user_level = Number(findUserLevel.user_level);
+
+        if(user_level < 3) {
+            throw new ForbiddenException('access_permission_denied');
+        }
+
+        // 날짜 변환: 'YYYY-MM-DD' -> 'YYYYMMDD0000' / 'YYYYMMDD2359'
+        const range = toDateRangeFromYMD(date);
+        const queryStartDate = range?.start || '';
+        const queryEndDate = range?.end || '';
+
+        let dateCondition = '';
+        let dateParams : string[] = [];
+        if(queryStartDate && queryEndDate) {
+            dateCondition = 'AND A.matchtime >= ? AND A.matchtime <= ?';
+            dateParams = [queryStartDate, queryEndDate];
+        }
+
+        let categoryCondition = '';
+        let categoryParams : string[] = [];
+
+        if(category) {
+            categoryCondition = 'WHERE A.category = ?';
+            categoryParams = [category];
+        }
+
+        const result = await this.analyzeRepository.findMatchInGenerateAnalyzePost(categoryCondition, categoryParams, dateCondition, dateParams, competition_id);
+        return result;
+    }
+
+    // 분석글 최종 작성
+    async generateAnalyzePost(generateAnalyzePost : GenerateAnalyzePostDto, user? : any) {
+
+
     }
 }
