@@ -40,7 +40,7 @@ export class AnalyzeService {
             categoryCondition, categoryParams, filterCondition, filterParams, user_id, page_no, limit
         );
 
-         const result = {
+        const result = {
             total_count : analyzeTotal[0].count,
             total_page : Math.ceil(analyzeTotal[0].count / limit),
             post : analyze_post

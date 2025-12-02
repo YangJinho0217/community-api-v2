@@ -527,6 +527,8 @@ export class SearchRpository {
   async findNews(search : string) {
     const sql = `
     SELECT title,
+           originallink,
+           link,
            pub_date,
            thumnail
     FROM news

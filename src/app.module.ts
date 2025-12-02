@@ -15,6 +15,7 @@ import { SportsModule } from './module/sports/sports.module';
 import { AnalyzeController } from './module/analyze/analyze.controller';
 import { AnalyzeService } from './module/analyze/analyze.service';
 import { AnalyzeModule } from './module/analyze/analyze.module';
+import { CommentModule } from './module/comment/comment.module';
 
 @Module({
   imports: [
@@ -28,7 +29,8 @@ import { AnalyzeModule } from './module/analyze/analyze.module';
     HomeModule,
     SearchModule,
     SportsModule,
-    AnalyzeModule
+    AnalyzeModule,
+    CommentModule
   ],
   controllers: [AppController],
   providers: [
