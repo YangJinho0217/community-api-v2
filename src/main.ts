@@ -10,6 +10,11 @@ import express from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin : "http://localhost:5173",
+    credentials : true,
+  })
+
   // 프록시 환경에서 클라이언트 IP 제대로 받기 (Nginx 등 리버스 프록시 대응)
   // 운영 환경에서는 환경변수로 제어 가능
   const trustProxy = process.env.TRUST_PROXY || 'true';
