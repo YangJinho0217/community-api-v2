@@ -25,23 +25,33 @@ export class ActivityLogInterceptor implements NestInterceptor {
       console.log('⏭️ 제외된 경로, 로깅 건너뜀');
       return next.handle();
     }
-    
-    // IP 주소 추출 (프록시 환경 고려)
-    let ip = request.ip || 
-             request.headers['x-forwarded-for'] as string || 
-             request.headers['x-real-ip'] as string || 
-             request.connection?.remoteAddress || 
-             'unknown';
-    
-    // IPv4-mapped IPv6 주소 정리 (::ffff:127.0.0.1 -> 127.0.0.1)
-    if (typeof ip === 'string' && ip.startsWith('::ffff:')) {
-      ip = ip.substring(7);
-    }
-    
-    // x-forwarded-for 헤더의 경우 첫 번째 IP만 사용 (proxy chain 고려)
-    if (typeof ip === 'string' && ip.includes(',')) {
-      ip = ip.split(',')[0].trim();
-    }
+
+    const getClientIp = (req: Request): string => {
+      // X-Forwarded-For 헤더에서 가장 왼쪽(원본 클라이언트) IP 추출
+      const forwarded = req.headers['x-forwarded-for'] as string | undefined;
+      let ip = forwarded?.split(',')[0].trim() ||
+               req.headers['x-real-ip'] as string ||
+               req.headers['x-client-ip'] as string ||
+               req.headers['cf-connecting-ip'] as string || // Cloudflare
+               req.socket?.remoteAddress ||
+               req.connection?.remoteAddress ||
+               req.ip || // Express의 trust proxy 설정으로 처리된 IP
+               'unknown';
+
+      // IPv6 매핑된 IPv4 주소 정리 (::ffff:127.0.0.1 → 127.0.0.1)
+      if (ip.startsWith('::ffff:')) {
+        ip = ip.replace('::ffff:', '');
+      }
+      
+    //   로컬호스트 주소들 정리
+      if (ip === '::1') {
+        ip = '127.0.0.1';
+      }
+      
+      return ip;
+    };
+
+    const ip = getClientIp(request);
     
     // JWT에서 user_id 추출 (있는 경우)
     const user = (request as any).user;

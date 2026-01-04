@@ -3,17 +3,20 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { ActivityLogInterceptor } from './common/activity-log.interceptor';
-import { DatabaseService } from './database/database.service';
-
-// import { DatabaseM}
-
-// Controller
-
-// Service
+import { DatabaseModule } from './database/database.module';
 
 // Module
 import { CommonModule } from './module/common/common.module';
 import { InitializeModule } from './module/initialize/initialize.module';
+import { HomeModule } from './module/home/home.module';
+import { SearchModule } from './module/search/search.module';
+import { SportsService } from './module/sports/sports.service';
+import { SportsModule } from './module/sports/sports.module';
+import { AnalyzeController } from './module/analyze/analyze.controller';
+import { AnalyzeService } from './module/analyze/analyze.service';
+import { AnalyzeModule } from './module/analyze/analyze.module';
+import { CommentModule } from './module/comment/comment.module';
+import { PortfolioModule } from './module/portfolio/portfolio.module';
 
 @Module({
   imports: [
@@ -21,13 +24,19 @@ import { InitializeModule } from './module/initialize/initialize.module';
       isGlobal: true,  // ✅ 전역으로 사용 가능
       envFilePath: '.env', // 루트에 .env 파일이 있으면 생략 가능
     }),
+    DatabaseModule,
     CommonModule,
-    InitializeModule
+    InitializeModule,
+    HomeModule,
+    SearchModule,
+    SportsModule,
+    AnalyzeModule,
+    CommentModule,
+    PortfolioModule
   ],
   controllers: [AppController],
   providers: [
     AppService, 
-    DatabaseService,
     ActivityLogInterceptor
   ],
   

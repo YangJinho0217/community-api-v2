@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, Res, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Res, Req, UseGuards } from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { CommonService } from './common.service';
 import { LoginDto } from './dto/login.dto';
@@ -13,6 +13,8 @@ import { RefreshTokenDto } from './dto/refreshToken.dto';
 import { GetUserUuidDto } from './dto/getUserUuid.dto';
 import { GetUserPasswordDto } from './dto/getUserPassword.dto';
 import { UpdateUserPasswordDto } from './dto/updateUserPassword.dto';
+import { OptionalJwtAuthGuard } from '../../auth/jwt/optional-jwt-auth.guard';
+import { LogOutDto } from './dto/logOut.dto';
 
 @Controller("/api/v2/common")
 export class CommonController {
@@ -23,6 +25,7 @@ export class CommonController {
     const data = await this.commonService.tryLogin(loginDto, response);
     return ApiResponse.success(data, "SignIn Success");
   }
+
 
   @Get("/auth/check/uuid")
   async getUserUuid(@Query() getUuidDto : GetUuidDto) {
@@ -83,6 +86,14 @@ export class CommonController {
   async updateUserPassword(@Body() updateUserPasswordDto : UpdateUserPasswordDto) {
     const data = await this.commonService.updateUserPassword(updateUserPasswordDto);
     return ApiResponse.message("Update User Password Success");
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('/logout')
+  async logout(@Body() logOutDto : LogOutDto, @Req() req, @Res({ passthrough: true }) response: Response) {
+    const user = req.user;
+    const data = await this.commonService.logout(logOutDto, user, response);
+    if (data == 200) return ApiResponse.message('Logout Success');
   }
 
 }

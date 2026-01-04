@@ -16,10 +16,10 @@ import { AuthCodeDto } from './dto/authCode.dto';
 import { GetReferrerDto } from './dto/getReferrer.dto';
 import { SignUpDto } from './dto/signUp.dto';
 import { RefreshTokenDto } from './dto/refreshToken.dto';
-import { JwtAuthGuard } from 'src/auth/jwt/jwt-auth.guard';
 import { GetUserUuidDto } from './dto/getUserUuid.dto';
 import { GetUserPasswordDto } from './dto/getUserPassword.dto';
 import { UpdateUserPasswordDto } from './dto/updateUserPassword.dto';
+import { LogOutDto } from './dto/logOut.dto';
 
 @Injectable()
 export class CommonService {
@@ -214,7 +214,7 @@ export class CommonService {
     await this.commonRepository.updateFcmTokenAndInsertSession(session_parameter);
 
     const result_user = {
-      user_id: user[0].id,
+      // user_id: user[0].id,
       uuid: user[0].uuid,
       user_type: user[0].user_type,
       user_name: user[0].user_name,
@@ -262,6 +262,7 @@ export class CommonService {
   async getUuid(getUuidDto: GetUuidDto) {
 
     const uuid = getUuidDto.uuid;
+    const type = getUuidDto.type;
 
     // uuid check
     const uuidRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{5,20}$/;
@@ -271,12 +272,29 @@ export class CommonService {
 
     const findUuid = await this.commonRepository.findUserUuid(uuid);
 
-    if (findUuid?.id) {
+    if(findUuid?.id) {
       throw new ConflictException('uuid_already_exists');
     }
 
-    return 200;
+    if(type == 'normal') {
+      if(!findUuid) {
+        throw new NotFoundException('not_found_uuid');
+      }
+    }
 
+    if(type == 'signup') {
+      if(findUuid?.id) {
+        throw new ConflictException('uuid_already_exists');
+      }
+    }
+
+    if(type == 'signup') {
+      if(findUuid?.id) {
+        throw new ConflictException('uuid_already_exists');
+      }
+    }
+
+    return 200;
   }
 
   async getNickName(getNickNameDto: GetNickNameDto) {
@@ -456,6 +474,10 @@ export class CommonService {
     }
 
     const user = await this.commonRepository.getUserUuid(phone);
+
+    if(!user) {
+      throw new NotFoundException('not_found_user');
+    }
     return user;
   }
 
@@ -509,6 +531,7 @@ export class CommonService {
       password : '',
       password_salt_key : ''
     };
+
     const uuid = updateUserPasswordDto.uuid;
     const phone = updateUserPasswordDto.phone;
     const auth_code = updateUserPasswordDto.auth_code;
@@ -570,6 +593,23 @@ export class CommonService {
       throw new BadRequestException('uuid_mismatch');
     }
 
+    // 현재 사용자 정보 조회 (현재 비밀번호 확인용)
+    const currentUser = await this.commonRepository.findUserOne(uuid);
+    if (!currentUser || currentUser.length < 1) {
+      throw new NotFoundException('not_found_user');
+    }
+
+    // 현재 비밀번호와 새 비밀번호가 동일한지 확인
+    const isSamePassword = this.hashService.validatePassword(
+      password,
+      currentUser[0].password_hash_key,
+      currentUser[0].password
+    );
+
+    if (isSamePassword) {
+      throw new BadRequestException('same_password');
+    }
+
     const hashPassword = this.hashService.hashPasswordWithNewSalt(password);
 
     if(hashPassword) {
@@ -581,6 +621,19 @@ export class CommonService {
 
     return 200;
 
+  }
+
+  async logout(logOutDto : LogOutDto, user?: any, response?: Response) {
+    // user는 OptionalJwtAuthGuard로부터 올 수 있음. 없을 경우에도 안전하게 동작
+    const deviceType = logOutDto.device_type;
+
+    // PC면 쿠키 삭제
+    if (deviceType === 'pc' && response) {
+      response.clearCookie('access_token');
+      response.clearCookie('refresh_token');
+    }
+
+    return 200;
   }
 
 }

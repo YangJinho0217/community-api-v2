@@ -26,6 +26,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       queueLimit: 0,
       decimalNumbers: true,
       timezone: '+09:00',
+      dateStrings: true
     });
 
     try {
